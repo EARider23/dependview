@@ -9,17 +9,29 @@ function App() {
   const [filter, setFilter] = useState('')
   const [logs, setLogs] = useState('')
   const logsRef = useRef(null)
-  const [isTauri, setIsTauri] = useState(false)
+  const [isTauri, setIsTauri] = useState(true) // Assume Tauri by default
 
   // Check if running in Tauri
   useEffect(() => {
-    setIsTauri(window.__TAURI__ !== undefined)
-    if (!window.__TAURI__) {
-      setLogs('⚠️  Running in browser mode. To use full features:\n' +
-             '   1. Run: npx tauri dev\n' +
-             '   2. Or build .exe: npx tauri build\n\n' +
-             '📝 For now, showing demo UI...\n\n')
+    // Check multiple ways to detect Tauri environment
+    const checkTauri = () => {
+      const hasTauri = window.__TAURI__ !== undefined || 
+                       window.__TAURI_INTERNALS__ !== undefined ||
+                       typeof invoke === 'function'
+      setIsTauri(hasTauri)
+      
+      if (!hasTauri) {
+        setLogs('⚠️  Running in browser mode. To use full features:\n' +
+               '   1. Run: npx tauri dev\n' +
+               '   2. Or build .exe: npx tauri build\n\n' +
+               '📝 For now, showing demo UI...\n\n')
+      }
     }
+    
+    // Check immediately and after a short delay
+    checkTauri()
+    const timer = setTimeout(checkTauri, 100)
+    return () => clearTimeout(timer)
   }, [])
 
   const formatBytes = (bytes) => {
@@ -37,13 +49,6 @@ function App() {
 
   const scan = async () => {
     if (!folder) return
-    
-    if (!isTauri) {
-      setLogs((l) => l + '⚠️  Cannot scan in browser mode.\n' +
-                         '   Run: npx tauri dev (to test)\n' +
-                         '   Or: npx tauri build (to create .exe)\n\n')
-      return
-    }
     
     setBusy(true)
     setSelectedPackages(new Set())
