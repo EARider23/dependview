@@ -428,6 +428,7 @@ fn mark_usage_for_packages(base_path: &Path, packages: &mut [InstalledPackage]) 
 }
 
 // Detect globally installed npm packages
+#[tauri::command]
 fn scan_global_npm() -> Vec<InstalledPackage> {
   use std::process::Command;
   let mut out = Vec::new();
@@ -466,6 +467,7 @@ fn scan_global_npm() -> Vec<InstalledPackage> {
 }
 
 // Detect globally installed pip packages
+#[tauri::command]
 fn scan_global_pip() -> Vec<InstalledPackage> {
   use std::process::Command;
   let mut out = Vec::new();
@@ -702,7 +704,8 @@ fn run_manager_cmd(app: tauri::AppHandle, manager: String, action: String, pkg: 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![scan_project, run_manager_cmd, delete_package])
+    .plugin(tauri_plugin_dialog::init())
+    .invoke_handler(tauri::generate_handler![scan_project, run_manager_cmd, delete_package, scan_global_npm, scan_global_pip])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
