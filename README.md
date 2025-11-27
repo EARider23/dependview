@@ -14,11 +14,16 @@ A visual package manager for developers built with Tauri + React + Rust.
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### For Users
 
+Just download and run the application! No prerequisites needed.
+
+## For Developers
+
+If you want to build from source, you'll need:
 - Node.js 18+
 - Rust (latest stable)
-- Python 3.8+ (optional, for Python package management)
+- Python 3.8+ (optional, for Python package management features)
 
 ### Development
 
