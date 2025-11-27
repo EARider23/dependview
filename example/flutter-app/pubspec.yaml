@@ -1,9 +1,0 @@
-name: example_flutter_app
-description: Example Flutter project to demo pubspec detection
-version: 0.0.1
-environment:
-  sdk: '>=2.18.0 <3.0.0'
-dependencies:
-  flutter:
-    sdk: flutter
-  http: ^0.13.0

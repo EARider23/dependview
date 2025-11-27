@@ -1,128 +1,94 @@
-# 📦 Package Space Analyzer
+# Peeak - Modern Package Manager
 
-A Windows desktop application that scans, analyzes, and manages installed packages across multiple ecosystems (npm, pip, composer, Flutter, cargo).
-
-[![Status](https://img.shields.io/badge/status-complete-brightgreen)]() [![Build](https://img.shields.io/badge/ready-to--build-success)]()
-
----
+A visual package manager for developers built with Tauri + React + Rust.
 
 ## ✨ Features
 
-- 🔍 **Scan Installed Packages** - Detects actual packages in `node_modules/`, `venv/`, `vendor/`, etc.
-- 📊 **Disk Space Analysis** - Shows size of each package and total space used
-- 🌍 **Global Package Detection** - Finds globally installed npm and pip packages
-- 🎯 **Usage Detection** - Marks packages as "used" or "unused" by scanning your code
-- 🔄 **Duplicate Detection** - Finds same package in multiple locations
-- 🗑️ **Uninstall Packages** - Remove packages with checkbox selection
-- 🪟 **Native Windows App** - Standalone .exe, no installation needed
-
----
+- 📊 **Size Analysis** - Sort packages by size, see which ones are bloating your projects
+- 💡 **Smart Search** - Popular package suggestions by category (dates, HTTP, testing, etc.)
+- 🎯 **Multi-Framework** - Supports npm, pip, pub (Flutter), cargo (Rust), and go modules
+- 🔍 **Project Scanner** - Scan any project and see all dependencies
+- 🌐 **System Packages** - View all globally installed packages across package managers
+- 🎨 **Modern UI** - Beautiful gradient design with Tailwind CSS + shadcn/ui components
+- 🐍 **Python venv Support** - Auto-detect and create virtual environments for Python projects
 
 ## 🚀 Quick Start
 
-### Build on Windows
+### Prerequisites
 
-```powershell
-npm ci
-npm run build
-npx tauri build
-```
+- Node.js 18+
+- Rust (latest stable)
+- Python 3.8+ (optional, for Python package management)
 
-**Output:** `src-tauri/target/release/Package Space Analyzer.exe`
-
-### Or Use GitHub Actions
-
-1. Push code to GitHub
-2. Go to Actions → "Build Release"
-3. Click "Run workflow"
-4. Download artifacts after build completes
-
----
-
-## ✅ Status: 100% COMPLETE
-
-All requested features implemented:
-- ✅ **Usage detection** - Scans code for imports to mark used/unused packages
-- ✅ **Global package detection** - Detects npm and pip global packages
-- ✅ **Build to .exe** - Configuration fixed, ready to build
-- ✅ Rust backend compiles without errors
-- ✅ React UI with checkboxes and uninstall
-- ✅ Disk space calculation for all packages
-- ✅ Duplicate detection across projects
-
----
-
-## 📖 Documentation
-
-- **[FINAL_STATUS.md](FINAL_STATUS.md)** - Complete implementation status ⭐ **START HERE**
-- **[BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)** - Detailed build guide for all platforms
-- **[VERIFICATION.md](VERIFICATION.md)** - Feature checklist and testing
-- **[READY.md](READY.md)** - Feature summary and usage guide
-
----
-
-## 🎯 How It Works
-
-1. **Pick a folder** containing projects with packages
-2. **Scan** to analyze installed packages
-3. **Review** packages with sizes, usage status, duplicates
-4. **Select** packages to remove with checkboxes
-5. **Uninstall** to free up disk space
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend:** React 18 + Vite 5
-- **Backend:** Rust (Tauri 2.9)
-- **UI:** Native desktop window
-- **Package Detection:** npm, pip, composer, Flutter, cargo
-
----
-
-## 📊 What Gets Detected
-
-| Package Manager | Location | Detection Method |
-|----------------|----------|------------------|
-| npm/yarn/pnpm | `node_modules/` | Scans folders + package.json |
-| pip | `venv/site-packages/` | Scans .dist-info directories |
-| composer | `vendor/` | Scans org/package structure |
-| Flutter/Dart | `.dart_tool/` | Reads package_config.json |
-| cargo | `Cargo.lock` | Parses lock file |
-| Global npm | System-wide | `npm list -g --json` |
-| Global pip | System-wide | `pip list --format=json` |
-
----
-
-## 🔧 Development
+### Development
 
 ```bash
 # Install dependencies
-npm ci
+npm install
 
-# Run dev mode (browser)
-npm run dev
-
-# Run Tauri dev mode (native window)
+# Run in development mode
 npx tauri dev
+```
 
+### Build
+
+```bash
 # Build for production
-npm run build
 npx tauri build
 ```
 
----
+The executable will be in `src-tauri/target/release/`.
 
-## 📦 Distribution
+## 🎯 How to Use
 
-The built `.exe` is **portable** - copy to any Windows PC and run. No installation required.
+1. **Browse Project** - Click "Browse & Import Project" to scan a project folder
+2. **System Packages** - View all globally installed npm and pip packages
+3. **Frameworks** - Detect installed frameworks and browse packages
+4. **Size Analysis** - Click "📊 Size" to sort packages by size
+5. **Smart Search** - Click popular package suggestions to search instantly
 
-For end users, use the generated `.msi` installer or `.exe` from `bundle/nsis/`.
+## 🏗️ Tech Stack
 
----
+- **Frontend**: React 18, Vite, Tailwind CSS, shadcn/ui
+- **Backend**: Rust, Tauri v2
+- **Package Managers**: npm, pip, pub, cargo, go
 
-## 🎉 Ready to Build!
+## 📝 Project Structure
 
-**All features complete. Just run the build command and you're done! 🚀**
+```
+peeak/
+├── src/                # React frontend
+│   ├── components/     # UI components (shadcn/ui)
+│   ├── lib/           # Utilities
+│   └── App.jsx        # Main app
+├── src-tauri/         # Rust backend
+│   ├── src/
+│   │   └── lib.rs     # Tauri commands
+│   └── Cargo.toml
+└── package.json
+```
 
-See [FINAL_STATUS.md](FINAL_STATUS.md) for detailed verification.
+## 🔧 Configuration
+
+- `tailwind.config.js` - Tailwind CSS configuration
+- `vite.config.js` - Vite bundler configuration
+- `src-tauri/tauri.conf.json` - Tauri app configuration
+
+## 📦 Available Commands
+
+All backend commands are in `src-tauri/src/lib.rs`:
+
+- `scan_project` - Scan a project folder for dependencies
+- `scan_system_packages` - Scan global npm and pip packages
+- `detect_frameworks` - Detect installed frameworks
+- `search_packages` - Search package registries
+- `install_package` - Install a package
+- `update_package` - Update a package
+
+## 🤝 Contributing
+
+This is a personal project, but feel free to fork and customize!
+
+## 📄 License
+
+MIT
