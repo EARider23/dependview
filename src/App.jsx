@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { FixedSizeList as VirtualList } from 'react-window'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Button } from './components/ui/button'
@@ -1338,54 +1339,56 @@ function App() {
               </div>
 
               {/* Card Grid Layout */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                  gap: 20,
-                  maxHeight: 600,
-                  overflow: 'auto',
-                  padding: 4
-                }}
-              >
-                {filteredPackages.map((pkg, i) => (
-                  <div
-                    key={i}
-                    className="package-card"
-                    style={{
-                      border: selectedPackages.has(pkg.path) 
-                        ? '3px solid #667eea' 
-                        : '2px solid #e0e0e0',
-                      borderRadius: 16,
-                      padding: 20,
-                      background: selectedPackages.has(pkg.path) 
-                        ? 'linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%)' 
-                        : 'white',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      position: 'relative',
-                      boxShadow: selectedPackages.has(pkg.path)
-                        ? '0 8px 24px rgba(102, 126, 234, 0.2)'
-                        : '0 4px 12px rgba(0, 0, 0, 0.05)'
-                    }}
-                    onClick={() => togglePackage(pkg.path)}
-                  >
+              <div style={{ padding: 4 }}>
+                <VirtualList
+                  height={600}
+                  itemCount={filteredPackages.length}
+                  itemSize={220}
+                  width={'100%'}
+                >
+                  {({ index, style }) => {
+                    const pkg = filteredPackages[index]
+                    return (
+                      <div
+                        key={pkg.path}
+                        style={{ ...style, padding: 8 }}
+                        className="package-card"
+                        onClick={() => togglePackage(pkg.path)}
+                      >
+                        <div
+                          style={{
+                            border: selectedPackages.has(pkg.path) 
+                              ? '3px solid #667eea' 
+                              : '2px solid #e0e0e0',
+                            borderRadius: 16,
+                            padding: 20,
+                            background: selectedPackages.has(pkg.path) 
+                              ? 'linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%)' 
+                              : 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            position: 'relative',
+                            boxShadow: selectedPackages.has(pkg.path)
+                              ? '0 8px 24px rgba(102, 126, 234, 0.2)'
+                              : '0 4px 12px rgba(0, 0, 0, 0.05)'
+                          }}
+                        >
                     {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={selectedPackages.has(pkg.path)}
-                      onChange={() => togglePackage(pkg.path)}
-                      style={{
-                        position: 'absolute',
-                        top: 16,
-                        right: 16,
-                        width: 24,
-                        height: 24,
-                        cursor: 'pointer',
-                        accentColor: '#667eea'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                            <input
+                              type="checkbox"
+                              checked={selectedPackages.has(pkg.path)}
+                              onChange={() => togglePackage(pkg.path)}
+                              style={{
+                                position: 'absolute',
+                                top: 16,
+                                right: 16,
+                                width: 24,
+                                height: 24,
+                                cursor: 'pointer',
+                                accentColor: '#667eea'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
 
                         {/* Package Icon: show package-provided icon (data URL) first, then bundled assets */}
                         <div style={{ marginBottom: 16 }}>
@@ -1515,8 +1518,137 @@ function App() {
                     >
                       📂 {pkg.path}
                     </div>
-                  </div>
-                ))}
+                        {/* rest of package card content continues unchanged... */}
+                        {/* Package Icon: show package-provided icon (data URL) first, then bundled assets */}
+                        <div style={{ marginBottom: 16 }}>
+                          {(() => {
+                            const rawName = (pkg.name || '').toLowerCase();
+                            const nameKey = rawName.startsWith('@') ? rawName.slice(1).replace('/', '-') : rawName.replace('/', '-');
+                            const assetMap = {
+                              'babel': babelImg,
+                              'babel-core': babelImg
+                            };
+                            const src = pkg.icon || assetMap[nameKey] || null;
+                            if (src) {
+                              return (
+                                <img src={src} alt={pkg.name} style={{ width: 70, height: 70, borderRadius: 12, objectFit: 'contain', boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }} />
+                              )
+                            }
+                            return (
+                              <div style={{
+                                width: 70,
+                                height: 70,
+                                background: pkg.manager === 'npm' ? 'linear-gradient(135deg, #cb3837 0%, #a02c2b 100%)' : pkg.manager === 'pip' ? 'linear-gradient(135deg, #3776ab 0%, #2a5a87 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                borderRadius: 16,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 36,
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                              }}>
+                                {pkg.manager === 'npm' ? '📦' : pkg.manager === 'pip' ? '🐍' : '📚'}
+                              </div>
+                            )
+                          })()}
+                        </div>
+
+                        {/* Package Name */}
+                        <div style={{ 
+                          fontWeight: 700, 
+                          fontSize: 17, 
+                          marginBottom: 12, 
+                          wordBreak: 'break-word',
+                          color: '#333',
+                          lineHeight: 1.3
+                        }}>
+                          {pkg.name}
+                        </div>
+
+                        {/* Manager Badge */}
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              background: pkg.manager === 'npm' 
+                                ? '#cb3837' 
+                                : pkg.manager === 'pip' 
+                                ? '#3776ab' 
+                                : '#885630',
+                              color: 'white',
+                              padding: '6px 14px',
+                              borderRadius: 20,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              letterSpacing: '0.5px'
+                            }}
+                          >
+                            {pkg.manager.toUpperCase()}
+                          </span>
+                          <span style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>v{pkg.version}</span>
+                          {pkg.used !== null && (
+                            <span
+                              style={{
+                                background: pkg.used 
+                                  ? 'linear-gradient(135deg, #28a745 0%, #20883a 100%)' 
+                                  : 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)',
+                                color: 'white',
+                                padding: '6px 12px',
+                                borderRadius: 20,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: '0.5px'
+                              }}
+                            >
+                              {pkg.used ? '✓ USED' : '✗ UNUSED'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Size with Category Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                          <div style={{ 
+                            fontSize: 22, 
+                            fontWeight: 700, 
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent'
+                          }}>
+                            {formatBytes(pkg.size)}
+                          </div>
+                          <span
+                            style={{
+                              background: getSizeInfo(pkg.size || 0).color,
+                              padding: '4px 10px',
+                              borderRadius: 12,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              letterSpacing: '0.5px'
+                            }}
+                          >
+                            {getSizeInfo(pkg.size || 0).emoji} {getSizeInfo(pkg.size || 0).label}
+                          </span>
+                        </div>
+
+                        {/* Path */}
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: '#999',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            background: '#f5f5f5',
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            marginTop: 8
+                          }}
+                          title={pkg.path}
+                        >
+                          📂 {pkg.path}
+                        </div>
+                      </div>
+                    )
+                  }}
+                </VirtualList>
               </div>
 
               {/* Duplicates Warning */}
