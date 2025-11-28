@@ -680,7 +680,6 @@ fn scan_project(folder: String) -> Result<serde_json::Value, String> {
 // Stream scan: emit packages as they are discovered to the frontend
 #[tauri::command]
 fn scan_project_stream(app: tauri::AppHandle, folder: String) -> Result<String, String> {
-  use tauri::Manager;
   println!("Streaming scan for folder: {}", folder);
 
   let folder_path = folder.clone();
@@ -689,7 +688,7 @@ fn scan_project_stream(app: tauri::AppHandle, folder: String) -> Result<String, 
   std::thread::spawn(move || {
     let base = Path::new(&folder_path);
     if !base.exists() {
-      let _ = app.emit_all("scan-error", serde_json::json!({ "error": "Folder does not exist" }));
+      let _ = app.emit("scan-error", serde_json::json!({ "error": "Folder does not exist" }));
       return;
     }
 
@@ -698,7 +697,7 @@ fn scan_project_stream(app: tauri::AppHandle, folder: String) -> Result<String, 
     // helper to emit a package event
     let emit_pkg = |ah: &tauri::AppHandle, pkg: &InstalledPackage| {
       if let Ok(v) = serde_json::to_value(pkg) {
-        let _ = ah.emit_all("scan-progress", serde_json::json!({ "package": v }));
+        let _ = ah.emit("scan-progress", serde_json::json!({ "package": v }));
       }
     };
 
@@ -743,7 +742,7 @@ fn scan_project_stream(app: tauri::AppHandle, folder: String) -> Result<String, 
     // Emit updated package info after usage marking
     for pkg in all_packages.iter() {
       if let Ok(v) = serde_json::to_value(pkg) {
-        let _ = app.emit_all("scan-progress", serde_json::json!({ "package": v }));
+        let _ = app.emit("scan-progress", serde_json::json!({ "package": v }));
       }
     }
 
@@ -760,7 +759,7 @@ fn scan_project_stream(app: tauri::AppHandle, folder: String) -> Result<String, 
     };
 
     if let Ok(v) = serde_json::to_value(&result) {
-      let _ = app.emit_all("scan-complete", v);
+      let _ = app.emit("scan-complete", v);
     }
   });
 
