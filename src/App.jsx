@@ -377,19 +377,20 @@ function App() {
     }
   }
 
-  // Scan current project
-  const scan = async () => {
-    if (!currentProject) {
+  // Scan a project (optionally pass a project object to scan immediately)
+  const scan = async (project = null) => {
+    const proj = project || currentProject
+    if (!proj) {
       showToast('No project selected', 'warning')
       return
     }
     setBusy(true)
-    setLogs((l) => l + `\n🔍 Scanning: ${currentProject.path}\n`)
+    setLogs((l) => l + `\n🔍 Scanning: ${proj.path}\n`)
     try {
-      const result = await invoke('scan_project', { projectPath: currentProject.path })
+      const result = await invoke('scan_project', { projectPath: proj.path })
       setScanResult(result)
       const updated = projects.map(p => 
-        p.path === currentProject.path ? { ...p, lastScanned: Date.now() } : p
+        p.path === proj.path ? { ...p, lastScanned: Date.now() } : p
       )
       setProjects(updated)
       localStorage.setItem('projects', JSON.stringify(updated))
@@ -430,6 +431,8 @@ function App() {
     setScanResult(null)
     setSelectedPackages(new Set())
     showToast(`Switched to: ${proj.name}`, 'info')
+    // Immediately scan the project we switched to so packages load
+    scan(proj)
   }
 
   // Remove project
