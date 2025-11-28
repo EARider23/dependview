@@ -1463,6 +1463,7 @@ pub fn run() {
     .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![
       scan_project, 
+      scan_project_stream,
       run_manager_cmd, 
       delete_package, 
       scan_global_npm, 
