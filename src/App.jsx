@@ -184,6 +184,72 @@ function App() {
     }
   }, [logs])
 
+  // Listen for streaming scan events (scan-progress, scan-complete)
+  useEffect(() => {
+    if (!isTauri || !window.__TAURI__ || !window.__TAURI__.event) return
+
+    let buffer = []
+    let flushTimer = null
+
+    const flush = () => {
+      if (buffer.length === 0) return
+      setScanResult(prev => {
+        const prevPackages = (prev && prev.packages) || []
+        return { ...prev, packages: [...prevPackages, ...buffer] }
+      })
+      buffer = []
+    }
+
+    const listenProgress = window.__TAURI__.event.listen('scan-progress', (e) => {
+      try {
+        const payload = e.payload
+        const pkg = payload && payload.package ? payload.package : payload
+        buffer.push(pkg)
+        if (!flushTimer) {
+          flushTimer = setTimeout(() => {
+            flush()
+            clearTimeout(flushTimer)
+            flushTimer = null
+          }, 150)
+        }
+      } catch (err) {
+        console.warn('scan-progress handler error', err)
+      }
+    })
+
+    const listenComplete = window.__TAURI__.event.listen('scan-complete', (e) => {
+      try {
+        if (flushTimer) {
+          clearTimeout(flushTimer)
+          flushTimer = null
+        }
+        flush()
+        const payload = e.payload
+        setScanResult(prev => ({ ...(prev || {}), packages: (prev && prev.packages) || [], total_size: payload.total_size || 0, total_count: payload.total_count || 0, duplicates: payload.duplicates || [] }))
+        showToast(`Scanned ${payload.total_count || 0} packages`, 'success')
+      } catch (err) {
+        console.warn('scan-complete handler error', err)
+      }
+    })
+
+    const listenError = window.__TAURI__.event.listen('scan-error', (e) => {
+      try {
+        const payload = e.payload
+        showToast(`Scan error: ${payload?.error || 'unknown'}`, 'error')
+      } catch (err) {
+        console.warn('scan-error handler', err)
+      }
+    })
+
+    // cleanup
+    return () => {
+      listenProgress.then(f => f && f())
+      listenComplete.then(f => f && f())
+      listenError.then(f => f && f())
+      if (flushTimer) clearTimeout(flushTimer)
+    }
+  }, [isTauri])
+
   // Toast helper using shadcn toast
   function showToast(message, type = 'info') {
     const variantMap = {
@@ -387,15 +453,21 @@ function App() {
     setBusy(true)
     setLogs((l) => l + `\n🔍 Scanning: ${proj.path}\n`)
     try {
-      const result = await invoke('scan_project', { projectPath: proj.path })
-      setScanResult(result)
+      // For Tauri backend use streaming scan to receive incremental packages
+      if (backend === 'tauri') {
+        // reset scan result so UI can populate incrementally
+        setScanResult({ packages: [], total_size: 0, total_count: 0, duplicates: [] })
+        await invoke('scan_project_stream', { folder: proj.path })
+      } else {
+        const result = await invoke('scan_project', { folder: proj.path })
+        setScanResult(result)
+      }
       const updated = projects.map(p => 
         p.path === proj.path ? { ...p, lastScanned: Date.now() } : p
       )
       setProjects(updated)
       localStorage.setItem('projects', JSON.stringify(updated))
-      setLogs((l) => l + `✓ Found ${result.total_count} packages (${formatBytes(result.total_size)})\n`)
-      showToast(`Scanned ${result.total_count} packages`, 'success')
+      // showToast will be triggered by scan-complete event when streaming
     } catch (e) {
       setLogs((l) => l + `✗ Scan failed: ${e}\n`)
       showToast(`Scan failed: ${e}`, 'error')

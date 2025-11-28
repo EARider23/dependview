@@ -677,6 +677,96 @@ fn scan_project(folder: String) -> Result<serde_json::Value, String> {
   serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
+// Stream scan: emit packages as they are discovered to the frontend
+#[tauri::command]
+fn scan_project_stream(app: tauri::AppHandle, folder: String) -> Result<String, String> {
+  use tauri::Manager;
+  println!("Streaming scan for folder: {}", folder);
+
+  let folder_path = folder.clone();
+
+  // spawn a background thread to avoid blocking the caller
+  std::thread::spawn(move || {
+    let base = Path::new(&folder_path);
+    if !base.exists() {
+      let _ = app.emit_all("scan-error", serde_json::json!({ "error": "Folder does not exist" }));
+      return;
+    }
+
+    let mut all_packages: Vec<InstalledPackage> = Vec::new();
+
+    // helper to emit a package event
+    let emit_pkg = |ah: &tauri::AppHandle, pkg: &InstalledPackage| {
+      if let Ok(v) = serde_json::to_value(pkg) {
+        let _ = ah.emit_all("scan-progress", serde_json::json!({ "package": v }));
+      }
+    };
+
+    // Scan node modules
+    let node_pkgs = scan_node_modules(base);
+    for pkg in node_pkgs.into_iter() {
+      emit_pkg(&app, &pkg);
+      all_packages.push(pkg);
+    }
+
+    // Scan python packages
+    let py_pkgs = scan_python_packages(base);
+    for pkg in py_pkgs.into_iter() {
+      emit_pkg(&app, &pkg);
+      all_packages.push(pkg);
+    }
+
+    // Composer
+    let comp_pkgs = scan_composer_packages(base);
+    for pkg in comp_pkgs.into_iter() {
+      emit_pkg(&app, &pkg);
+      all_packages.push(pkg);
+    }
+
+    // Flutter
+    let fl_pkgs = scan_flutter_packages(base);
+    for pkg in fl_pkgs.into_iter() {
+      emit_pkg(&app, &pkg);
+      all_packages.push(pkg);
+    }
+
+    // Cargo
+    let cargo_pkgs = scan_cargo_packages(base);
+    for pkg in cargo_pkgs.into_iter() {
+      emit_pkg(&app, &pkg);
+      all_packages.push(pkg);
+    }
+
+    // After collecting packages, mark usage (this may be expensive)
+    mark_usage_for_packages(base, &mut all_packages);
+
+    // Emit updated package info after usage marking
+    for pkg in all_packages.iter() {
+      if let Ok(v) = serde_json::to_value(pkg) {
+        let _ = app.emit_all("scan-progress", serde_json::json!({ "package": v }));
+      }
+    }
+
+    // totals and duplicates
+    let total_size: u64 = all_packages.iter().map(|p| p.size).sum();
+    let total_count = all_packages.len();
+    let duplicates = find_duplicates(&all_packages);
+
+    let result = ScanResult {
+      packages: all_packages.clone(),
+      total_size,
+      total_count,
+      duplicates,
+    };
+
+    if let Ok(v) = serde_json::to_value(&result) {
+      let _ = app.emit_all("scan-complete", v);
+    }
+  });
+
+  Ok("started".into())
+}
+
 #[tauri::command]
 fn delete_package(path: &str) -> Result<String, String> {
   use std::fs;
