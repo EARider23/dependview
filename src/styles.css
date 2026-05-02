@@ -1,0 +1,301 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 262.1 83.3% 57.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-white text-foreground;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Hide scrollbar completely but allow scrolling */
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* Button Animations */
+button {
+  transition: all 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Glowing Dots Styling */
+.glowing-dot {
+  will-change: transform, background-color;
+  transform-origin: center;
+  background-color: #d1d5db;
+  border-radius: 50%;
+  width: 1em;
+  height: 1em;
+  position: absolute;
+  transform: translate(0);
+}
+
+/* Card Hover Effect */
+.package-card {
+  transition: all 0.2s ease;
+}
+
+.package-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Loading Spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Toast / Snackbar */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.toast {
+  min-width: 280px;
+  max-width: 420px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toast.info { background: linear-gradient(90deg,#2196F3,#42A5F5); }
+.toast.success { background: linear-gradient(90deg,#28a745,#20c997); }
+.toast.warning { background: linear-gradient(90deg,#ff9800,#ffb74d); }
+.toast.error { background: linear-gradient(90deg,#e53935,#ef5350); }
+.toast .icon { font-size: 18px }
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.06) 100%);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150px;
+  width: 150px;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 100%);
+  animation: shimmer 1s infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(300px); }
+}
+
+.skeleton-line { height: 12px; background: rgba(255,255,255,0.04); border-radius: 6px; margin-bottom: 8px }
+.skeleton-avatar { width: 70px; height: 70px; border-radius: 12px; background: rgba(255,255,255,0.03) }
+
+/* App centered container sitting above the white background
+   - Inset from all four sides via max-width/height calculations
+   - Subtle purple tint gradient to sit above the white background
+*/
+.app-gradient-container {
+  margin: 32px auto;
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 64px);
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(107,70,193,0.12) 0%, rgba(99,102,241,0.08) 100%);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
+  overflow: auto;
+}
+
+/* Utility to disable hover effects for specific buttons */
+.no-hover {
+  /* only suppress the translateY lift and box-shadow pop */
+}
+.no-hover:hover:not(:disabled) {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Glassmorphic card utility */
+.glass-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(147, 51, 234, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.4s ease, border-color 0.3s ease;
+}
+.glass-card:hover {
+  box-shadow: 0 16px 48px rgba(147, 51, 234, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+  border-color: rgba(147, 51, 234, 0.15);
+}
+
+/* Purple glow heartbeat for empty states */
+@keyframes glassPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(147, 51, 234, 0.08); }
+  50% { box-shadow: 0 0 40px rgba(147, 51, 234, 0.18); }
+}
+.glass-pulse {
+  animation: glassPulse 3s ease-in-out infinite;
+}
+
+/* Smooth gradient shimmer for card hover */
+@keyframes cardShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-hover {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(147,51,234,0.03) 50%, transparent 100%);
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 1;
+}
+.shimmer-hover:hover::before {
+  opacity: 1;
+  animation: cardShimmer 1.5s ease-in-out;
+}
+
+/* Toast auto-dismiss progress bar animation */
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-toast-progress {
+  animation: toast-progress linear forwards;
+}
+
+@keyframes beam {
+  from {
+    stroke-dashoffset: 500;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-beam {
+  animation: beam 3s linear infinite;
+}
