@@ -2,7 +2,7 @@ import React, { useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, RefreshCw, HardDrive, ShieldCheck, Zap, FolderOpen, FolderMinus,
-  Search, X, Box, Square, Menu, Trash2, ArrowUpCircle, Package, Play, Plus, ExternalLink
+  Search, X, Box, Square, Menu, Trash2, ArrowUpCircle, Package, Play, Plus, ExternalLink, Database
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -53,11 +53,11 @@ const ProjectDetailsView = ({
     handleUpdate,
     handleDelete,
     openFolder,
-    handleUpdateSelected,
     handleUpdateAll,
     togglePackage,
     installingPackagesHasPath,
-    installingPackages
+    installingPackages,
+    runScript
   } = useProject(currentProject, showToast)
 
   const handleImageUpload = (e) => {
@@ -149,10 +149,9 @@ const ProjectDetailsView = ({
             <ArrowLeft className="w-4 h-4 text-gray-600" />
           </Button>
           <div>
-            <h2 className="text-xl font-black text-gray-900 tracking-tight">{currentProject.name}</h2>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[200px]">{currentProject.path}</span>
-            </div>
+            <h2 className="text-2xl font-black tracking-tight text-gray-900 flex items-center">
+              Project <span className="text-purple-600 ml-1">Details</span>
+            </h2>
           </div>
         </div>
 
@@ -351,7 +350,7 @@ const ProjectDetailsView = ({
             <motion.div
               variants={{ hover: { y: -5, scale: 1.05 } }}
               onClick={() => fileInputRef.current?.click()}
-              className="w-24 h-24 rounded-[2rem] bg-white shadow-xl flex items-center justify-center mb-6 border border-indigo-100 transition-all duration-700 ease-out ring-2 ring-indigo-50/50 overflow-hidden cursor-pointer group/icon"
+              className="w-24 h-24 rounded-[2rem] bg-white shadow-xl flex items-center justify-center mb-6 border border-indigo-100 transition-all duration-700 ease-out ring-1 ring-indigo-50/30 overflow-hidden cursor-pointer group/icon"
             >
               {currentProject?.image ? (
                 <div className="relative w-full h-full group/img">
@@ -423,174 +422,316 @@ const ProjectDetailsView = ({
           <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full group-hover:bg-indigo-500/10 transition-all duration-700" />
         </motion.div>
 
-        {/* Right Side Grid Column */}
-        <div className="xl:col-span-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Row 1 Metric Cards */}
-          <div className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-indigo-200 transition-all">
-            <div className="space-y-1.5">
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
-              >
-                <Box className="w-5 h-5" />
-              </motion.div>
-              <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Packages</span>
-            </div>
-            <div className="mt-2">
-              <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
-                <AnimatedCounter value={displayMetrics.pkgCount} />
-              </span>
-            </div>
+        {/* Row 1 Metric Cards */}
+        <div className="xl:col-span-2 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-indigo-200 transition-all">
+          <div className="space-y-1.5">
+            <motion.div
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
+            >
+              <Box className="w-5 h-5" />
+            </motion.div>
+            <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Packages</span>
           </div>
-
-          <div className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-blue-200 transition-all">
-            <div className="space-y-1.5">
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: -5 }}
-                className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 transition-colors group-hover:bg-blue-600 group-hover:text-white"
-              >
-                <RefreshCw className="w-5 h-5" />
-              </motion.div>
-              <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Updates</span>
-            </div>
-            <div className="mt-2">
-              <span className={`text-3xl font-black tracking-tighter leading-none ${displayMetrics.outdatedCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                <AnimatedCounter value={displayMetrics.outdatedCount} />
-              </span>
-            </div>
+          <div className="mt-2">
+            <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+              <AnimatedCounter value={displayMetrics.pkgCount} />
+            </span>
           </div>
+        </div>
 
-          <div className="col-span-2 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group relative overflow-hidden hover:border-red-200 transition-all">
-            <div className="absolute top-5 right-5">
-              <motion.div
-                whileHover={{ scale: 1.2, rotate: 10 }}
-                className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100 transition-colors group-hover:bg-red-600 group-hover:text-white group-hover:border-red-600"
-              >
-                <ShieldCheck className="w-5 h-5" />
-              </motion.div>
-            </div>
-            <div className="space-y-2">
-              <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Security Analysis</span>
-              <div className="flex flex-col">
-                {isLoadingAudit ? (
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
-                    <span className="text-xl font-black text-slate-400 animate-pulse uppercase tracking-widest">Auditing...</span>
-                  </div>
-                ) : (
-                  <>
-                    <span className={`text-3xl font-black tracking-tighter leading-none ${displayMetrics.totalVulns > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {displayMetrics.totalVulns > 0 ? `${displayMetrics.totalVulns} Vulnerabilities` : 'Project Secure'}
-                    </span>
-                    <div className="flex gap-2 mt-3">
-                      {displayMetrics.criticalCount > 0 && (
-                        <Badge className="bg-rose-950 text-white border-0 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
-                          Critical: {displayMetrics.criticalCount}
-                        </Badge>
-                      )}
-                      {displayMetrics.highCount > 0 && (
-                        <Badge className="bg-red-600 text-white border-0 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
-                          High: {displayMetrics.highCount}
-                        </Badge>
-                      )}
-                      {displayMetrics.totalVulns === 0 && (
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
-                          Verified Clean
-                        </Badge>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+        <div className="xl:col-span-2 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-blue-200 transition-all">
+          <div className="space-y-1.5">
+            <motion.div
+              whileHover={{ scale: 1.1, rotate: -5 }}
+              className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 transition-colors group-hover:bg-blue-600 group-hover:text-white"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </motion.div>
+            <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Updates</span>
           </div>
-
-          {/* Row 2 Metric Cards */}
-          <div className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-slate-300 transition-all">
-            <div className="space-y-1.5">
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 transition-colors group-hover:bg-slate-900 group-hover:text-white"
-              >
-                <HardDrive className="w-5 h-5" />
-              </motion.div>
-              <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Disk Usage</span>
-            </div>
-            <div className="mt-2">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter leading-none">
-                <AnimatedCounter value={displayMetrics.totalSize} formatter={formatBytes} />
-              </span>
-            </div>
+          <div className="mt-2">
+            <span className={`text-3xl font-black tracking-tighter leading-none ${displayMetrics.outdatedCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              <AnimatedCounter value={displayMetrics.outdatedCount} />
+            </span>
           </div>
+        </div>
 
-          <div className="col-span-3 bg-slate-50 rounded-[2rem] p-5 border border-slate-200 shadow-inner flex flex-col justify-between group hover:bg-slate-100/50 transition-all h-[140px]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 font-black uppercase text-[9px] tracking-widest">Environment Root</span>
-                <Badge className="bg-slate-900 text-white border-0 font-black text-[8px] rounded-lg px-2 py-0.5 shadow-sm uppercase tracking-widest">Isolated</Badge>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 p-2 bg-white rounded-2xl border border-slate-200 shadow-sm">
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: -15 }}
-                onClick={() => openFolder(currentProject?.path)}
-                className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 border border-slate-200 hover:bg-slate-900 hover:text-white transition-all cursor-pointer shadow-sm"
-              >
-                <FolderOpen className="w-4 h-4" />
-              </motion.div>
-              <span className="text-xs font-bold text-slate-600 truncate flex-1 tracking-tight">{currentProject?.path}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => openFolder(currentProject?.path)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </Button>
-            </div>
+        <div className="xl:col-span-4 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group relative overflow-hidden hover:border-red-200 transition-all">
+          <div className="absolute top-5 right-5">
+            <motion.div
+              whileHover={{ scale: 1.2, rotate: 10 }}
+              className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100 transition-colors group-hover:bg-red-600 group-hover:text-white group-hover:border-red-600"
+            >
+              <ShieldCheck className="w-5 h-5" />
+            </motion.div>
           </div>
-
-          {/* Row 3: Scripts (Now under Env Path) */}
-          <div className="xl:col-span-4 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm group hover:border-indigo-100 transition-all h-[140px] overflow-hidden flex flex-col">
-            <div className="flex items-center gap-3 mb-3">
-              <motion.div
-                whileHover={{ scale: 1.1, y: -2 }}
-                className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg"
-              >
-                <Zap className="w-4 h-4" />
-              </motion.div>
-              <div className="flex flex-col">
-                <span className="text-slate-900 font-black uppercase text-[10px] tracking-[0.1em]">Project Scripts</span>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 overflow-y-auto pr-2 custom-scrollbar flex-1">
-              {projectScripts && Object.keys(projectScripts).length > 0 ? (
-                Object.keys(projectScripts).map(script => (
-                  <motion.div
-                    key={script}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      variant="outline"
-                      className="h-8 px-3 rounded-xl border-slate-100 bg-slate-50/50 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 font-black text-[9px] uppercase tracking-widest transition-all group/btn flex items-center gap-2 shadow-sm"
-                    >
-                      <div className="w-3.5 h-3.5 rounded-full bg-white group-hover/btn:bg-indigo-500 transition-colors flex items-center justify-center shadow-sm">
-                        <Play className="w-2 h-2 text-indigo-600 group-hover/btn:text-white fill-current" />
-                      </div>
-                      {script}
-                    </Button>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="w-full flex items-center justify-center h-full">
-                  <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest text-center">No scripts</span>
+          <div className="space-y-2">
+            <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Security Analysis</span>
+            <div className="flex flex-col">
+              {isLoadingAudit ? (
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
+                  <span className="text-xl font-black text-slate-400 animate-pulse uppercase tracking-widest">Auditing...</span>
                 </div>
+              ) : (
+                <>
+                  <span className={`text-3xl font-black tracking-tighter leading-none ${displayMetrics.totalVulns > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {displayMetrics.totalVulns > 0 ? `${displayMetrics.totalVulns} Vulnerabilities` : 'Project Secure'}
+                  </span>
+                  <div className="flex gap-2 mt-3">
+                    {displayMetrics.criticalCount > 0 && (
+                      <Badge className="bg-rose-950 text-white border-0 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
+                        Critical: {displayMetrics.criticalCount}
+                      </Badge>
+                    )}
+                    {displayMetrics.highCount > 0 && (
+                      <Badge className="bg-red-600 text-white border-0 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
+                        High: {displayMetrics.highCount}
+                      </Badge>
+                    )}
+                    {displayMetrics.totalVulns === 0 && (
+                      <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
+                        Verified Clean
+                      </Badge>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
         </div>
+
+        {/* Row 2 Metric Cards */}
+        <div className="xl:col-span-2 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-slate-300 transition-all">
+          <div className="space-y-1.5">
+            <motion.div
+              whileHover={{ scale: 1.1 }}
+              className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 transition-colors group-hover:bg-slate-900 group-hover:text-white"
+            >
+              <HardDrive className="w-5 h-5" />
+            </motion.div>
+            <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Disk Usage</span>
+          </div>
+          <div className="mt-2">
+            <span className="text-2xl font-black text-slate-900 tracking-tighter leading-none">
+              <AnimatedCounter value={displayMetrics.totalSize} formatter={formatBytes} />
+            </span>
+          </div>
+        </div>
+
+        <div className="xl:col-span-6 bg-slate-50 rounded-[2rem] p-5 border border-slate-200 shadow-inner flex flex-col justify-between group hover:bg-slate-100/50 transition-all h-[140px]">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 font-black uppercase text-[9px] tracking-widest">Environment Root</span>
+              <Badge className="bg-slate-900 text-white border-0 font-black text-[7px] rounded-lg px-1.5 py-0 shadow-sm uppercase tracking-widest">Isolated</Badge>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 p-2 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <motion.div
+              whileHover={{ scale: 1.1, rotate: -15 }}
+              onClick={() => openFolder(currentProject?.path)}
+              className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 border border-slate-200 hover:bg-slate-900 hover:text-white transition-all cursor-pointer shadow-sm"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </motion.div>
+            <span className="text-xs font-bold text-slate-600 truncate flex-1 tracking-tight">{currentProject?.path}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openFolder(currentProject?.path)}
+              className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Row 3: Scripts (Now under Env Path) */}
+        <div className="xl:col-span-8 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm group hover:border-indigo-100 transition-all h-[140px] overflow-hidden flex flex-col">
+          <div className="flex items-center gap-3 mb-3">
+            <motion.div
+              whileHover={{ scale: 1.1, y: -2 }}
+              className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg"
+            >
+              <Zap className="w-4 h-4" />
+            </motion.div>
+            <div className="flex flex-col">
+              <span className="text-slate-900 font-black uppercase text-[10px] tracking-[0.1em]">Project Scripts</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 overflow-y-auto pr-2 custom-scrollbar flex-1">
+            {projectScripts && Object.keys(projectScripts).length > 0 ? (
+              Object.keys(projectScripts).map(script => (
+                <motion.div
+                  key={script}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Button
+                    variant="outline"
+                    onClick={() => runScript(script)}
+                    className="h-8 px-3 rounded-xl border-slate-100 bg-slate-50/50 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 font-black text-[9px] uppercase tracking-widest transition-all group/btn flex items-center gap-2 shadow-sm"
+                  >
+                    <div className="w-3.5 h-3.5 rounded-full bg-white group-hover/btn:bg-indigo-500 transition-colors flex items-center justify-center shadow-sm">
+                      <Play className="w-2 h-2 text-indigo-600 group-hover/btn:text-white fill-current" />
+                    </div>
+                    {script}
+                  </Button>
+                </motion.div>
+              ))
+            ) : (
+              <div className="w-full flex items-center justify-center h-full">
+                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest text-center">No scripts</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Storage Insights: Stealth Monochrome Section */}
+      <div className="mb-14 mt-6 bg-[#080808] rounded-[2.5rem] p-10 border border-white/5 shadow-2xl relative overflow-hidden">
+        {/* Subtle Scanline Effect Overlay */}
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+
+        <div className="relative z-10">
+          {/* Tactical Header: Unified Center Text with Thermal Indicators */}
+          <div className="flex items-center justify-between mb-12 relative px-2">
+            <motion.div 
+              initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }}
+              className="flex flex-col gap-1.5"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                <span className="text-[11px] font-black text-rose-500 uppercase tracking-[0.25em] leading-none drop-shadow-[0_0_8px_rgba(244,63,94,0.3)]">High Usage</span>
+              </div>
+              <span className="text-[8px] font-bold text-slate-600 uppercase tracking-[0.15em] pl-3.5">Max Storage</span>
+            </motion.div>
+            
+            <div className="flex-1 mx-16 relative flex items-center justify-center">
+               <div className="absolute inset-0 flex items-center">
+                  <div className="w-full h-[1px] bg-white/5" />
+               </div>
+               <div className="relative z-20 bg-[#080808] px-10 py-3 border border-white/10 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.02)]">
+                  <span className="text-[10px] font-black text-white uppercase tracking-[0.6em] flex items-center gap-3">
+                    <Database className="w-3 h-3 text-slate-500" />
+                    Storage Consumed Package
+                  </span>
+               </div>
+            </div>
+  
+            <motion.div 
+              initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }}
+              className="flex flex-col items-end gap-1.5"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black text-cyan-400 uppercase tracking-[0.25em] leading-none drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">Low Usage</span>
+                <div className="w-1.5 h-1.5 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+              </div>
+              <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.15em] pr-3.5">Min Storage</span>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+            {topPackages && topPackages.length > 0 ? (
+              topPackages.map((pkg, idx) => {
+                // Smart Brand Detection using iconLinks.js
+                const pkgLower = pkg.name.toLowerCase();
+                let techKey = pkgLower;
+                
+                if (pkgLower.includes('firebase')) techKey = 'firebase';
+                else if (pkgLower.includes('three')) techKey = 'three';
+                
+                const tech = getTechIcon(techKey);
+                const displayIcon = tech.image;
+                
+                return (
+                  <motion.div
+                    key={pkg.name}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: idx * 0.08 }}
+                    whileHover={{ y: -8 }}
+                    className="relative group"
+                  >
+                    {/* Tactical Data Card: Enhanced Glow Style */}
+                    <div className="bg-[#121212] rounded-[2rem] p-6 border border-white/5 group-hover:border-white/10 group-hover:bg-[#161616] group-hover:shadow-[0_0_40px_rgba(255,255,255,0.03)] transition-all duration-500 h-[230px] flex flex-col justify-between relative overflow-hidden">
+                      {/* Background Index Number with Glow */}
+                      <div className="absolute top-4 right-6 text-[45px] font-black text-white/[0.01] group-hover:text-white/[0.05] transition-all duration-700 leading-none select-none italic tracking-tighter group-hover:drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                        0{idx + 1}
+                      </div>
+  
+                      <div className="relative z-10">
+                        {/* Icon Container with White Backdrop for Dark Icons */}
+                        <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-2xl mb-6 group-hover:bg-white/[0.08] group-hover:scale-110 group-hover:border-white/10 transition-all overflow-hidden relative shadow-inner">
+                          {/* Visibility Glow for Dark Icons */}
+                          <div className="absolute inset-2 bg-white/40 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                          
+                          {displayIcon ? (
+                            <img 
+                              src={displayIcon} 
+                              alt={pkg.name} 
+                              className="w-7 h-7 object-contain relative z-10 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" 
+                            />
+                          ) : (
+                            <Box className="w-5 h-5 text-slate-400 relative z-10" />
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.25em]">ID: {pkg.name.slice(0, 10)}...</span>
+                          <h4 className="text-[14px] font-black text-white truncate tracking-tight group-hover:text-white transition-colors">
+                            {pkg.name}
+                          </h4>
+                        </div>
+                      </div>
+    
+                      <div className="relative z-10">
+                        <div className="flex items-baseline gap-1.5 mb-5">
+                          <span className="text-3xl font-black text-white tracking-tighter tabular-nums leading-none">
+                            {formatBytes(pkg.size).split(' ')[0]}
+                          </span>
+                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest leading-none">
+                            {formatBytes(pkg.size).split(' ')[1]}
+                          </span>
+                        </div>
+    
+                        {/* Metric Visualizer */}
+                        <div className="space-y-2.5">
+                          <div className="flex justify-between items-center px-0.5">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none">
+                              {idx === 0 ? 'MAX LOAD' : 'NOMINAL'}
+                            </span>
+                            <span className="text-[10px] font-black text-white/50 tabular-nums">
+                              {Math.round((pkg.size / topPackages[0].size) * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/[0.03] rounded-full overflow-hidden p-[1px]">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${(pkg.size / topPackages[0].size) * 100}%` }}
+                              transition={{ duration: 1.5, delay: idx * 0.1 + 0.5, ease: [0.22, 1, 0.36, 1] }}
+                              className={`h-full rounded-full ${idx === 0 ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-slate-600 group-hover:bg-slate-400'} transition-all`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            ) : (
+              <div className="col-span-5 py-24 flex flex-col items-center justify-center bg-[#121212] rounded-[2.5rem] border border-dashed border-white/5">
+                <HardDrive className="w-10 h-10 text-slate-800 mb-4" />
+                <span className="text-[11px] font-black text-slate-700 uppercase tracking-[0.4em]">Standby: Initializing Data</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+
+
 
       {/* Search & Registry */}
       <div className="mb-8">

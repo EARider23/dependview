@@ -215,6 +215,21 @@ export const useProject = (currentProject, showToast) => {
     }
   }, [])
 
+  const runScript = useCallback(async (scriptName) => {
+    if (!currentProject) return
+    const invoke = await getInvoke()
+    try {
+      showToast(`Running script: ${scriptName}`, 'info')
+      await invoke('run_script', { 
+        projectPath: currentProject.path, 
+        scriptName 
+      })
+      showToast(`Script ${scriptName} completed`, 'success')
+    } catch (e) {
+      showToast(`Script failed: ${e}`, 'error')
+    }
+  }, [currentProject, getInvoke, showToast])
+
   // Auto-scan when project changes
   useEffect(() => {
     if (currentProject && lastScannedPathRef.current !== currentProject.path) {
@@ -340,6 +355,7 @@ export const useProject = (currentProject, showToast) => {
     handleUpdateSelected,
     handleUpdateAll,
     togglePackage,
-    installingPackagesHasPath
+    installingPackagesHasPath,
+    runScript
   }
 }
