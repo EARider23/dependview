@@ -243,7 +243,7 @@ export const techIcons = {
     'playwright': { name: 'Playwright', color: 'bg-green-600', icon: 'P', textColor: 'text-white', image: playwrightIcon },
     'testing-library': { name: 'Testing Library', color: 'bg-red-600', icon: '🐙', textColor: 'text-white', image: testinglibraryIcon },
 
-    // Misc
+    // Misc & Utilities
     'lodash': { name: 'Lodash', color: 'bg-blue-600', icon: 'L', textColor: 'text-white', image: lodashIcon },
     'axios': { name: 'Axios', color: 'bg-purple-500', icon: 'A', textColor: 'text-white', image: axiosIcon },
     'zod': { name: 'Zod', color: 'bg-blue-600', icon: 'Z', textColor: 'text-white', image: zodIcon },
@@ -252,9 +252,20 @@ export const techIcons = {
     'moment': { name: 'Moment.js', color: 'bg-black', icon: 'M', textColor: 'text-white', image: momentjsIcon },
     'nanoid': { name: 'Nano ID', color: 'bg-blue-500', icon: 'N', textColor: 'text-white', image: nanoidIcon },
     'uuid': { name: 'UUID', color: 'bg-green-600', icon: 'U', textColor: 'text-white', image: uuidIcon },
+    'clsx': { name: 'clsx', color: 'bg-blue-600', icon: 'C', textColor: 'text-white', image: null },
+    'cva': { name: 'CVA', color: 'bg-gray-800', icon: 'C', textColor: 'text-white', image: cvaIcon },
+    'class-variance-authority': { name: 'CVA', color: 'bg-gray-800', icon: 'C', textColor: 'text-white', image: cvaIcon },
+    'sonner': { name: 'Sonner', color: 'bg-orange-500', icon: 'S', textColor: 'text-white', image: null },
+    'motion': { name: 'Motion', color: 'bg-purple-600', icon: 'M', textColor: 'text-white', image: framermotionIcon },
+    'react-window': { name: 'React Window', color: 'bg-blue-500', icon: 'W', textColor: 'text-white', image: reactIcon },
+    'react-error-boundary': { name: 'React Error Boundary', color: 'bg-red-500', icon: '!', textColor: 'text-white', image: reactIcon },
+    'vitest': { name: 'Vitest', color: 'bg-green-500', icon: 'V', textColor: 'text-white', image: vitestIcon },
     'discord': { name: 'Discord', color: 'bg-indigo-500', icon: 'D', textColor: 'text-white', image: discordIcon },
     'slack': { name: 'Slack', color: 'bg-purple-500', icon: 'S', textColor: 'text-white', image: slackIcon },
 }
+
+// Brand matching cache to avoid redundant calculations across hundreds of cards
+const brandCache = new Map();
 
 export const getTechIcon = (tech) => {
     if (!tech) return { name: '?', color: 'bg-gray-500', icon: '?', textColor: 'text-gray-500', image: null }
@@ -269,4 +280,37 @@ export const getTechIcon = (tech) => {
     }
 }
 
-export const getPackageIcon = (pkgName) => getTechIcon(pkgName)
+export const getBestIcon = (name) => {
+    if (!name) return getTechIcon(name);
+    if (brandCache.has(name)) return brandCache.get(name);
+
+    const lowerName = name.toLowerCase();
+    const normalized = lowerName.replace(/[@\/\s\.-]/g, '');
+
+    let result;
+    // 1. Try exact or normalized match
+    if (techIcons[normalized]) {
+        result = techIcons[normalized];
+    } else if (techIcons[lowerName]) {
+        result = techIcons[lowerName];
+    } else {
+        // 2. Try keyword/prefix match for known brands (firebase, radix, three, etc.)
+        const brands = Object.keys(techIcons).sort((a, b) => b.length - a.length);
+        const foundBrand = brands.find(brand => {
+            if (brand.length < 3) return false;
+            return lowerName.includes(brand) || normalized.includes(brand);
+        });
+
+        if (foundBrand) {
+            result = techIcons[foundBrand];
+        } else {
+            // 3. Fallback to default logic
+            result = getTechIcon(name);
+        }
+    }
+
+    brandCache.set(name, result);
+    return result;
+};
+
+export const getPackageIcon = (pkgName) => getBestIcon(pkgName)
