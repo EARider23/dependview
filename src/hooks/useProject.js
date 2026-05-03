@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { isTauri, mockInvoke, setupMockEventListeners } from '../lib/browserMock'
+import { getTechIcon } from '../assets/iconLinks'
 
 export const useProject = (currentProject, showToast) => {
   const [scanResult, setScanResult] = useState({ packages: [], total_size: 0, total_count: 0, duplicates: [] })
@@ -14,12 +15,12 @@ export const useProject = (currentProject, showToast) => {
   const [filter, setFilter] = useState('')
   const [sortBy, setSortBy] = useState('name')
   const [packageView, setPackageView] = useState('grid')
-  
+
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [selectedPackages, setSelectedPackages] = useState(new Set())
   const [installingPackages, setInstallingPackages] = useState(new Map())
-  
+
   const scanResultRef = useRef(null)
   const lastScannedPathRef = useRef(null)
 
@@ -37,14 +38,17 @@ export const useProject = (currentProject, showToast) => {
     const invoke = await getInvoke()
     setBusy(true)
     setIsScanning(true)
-    
+
     try {
       // Use streaming scan
       await invoke('scan_project_stream', { folder: proj.path })
-      
+
       // Detect technologies
       const techs = await invoke('detect_project_technologies', { projectPath: proj.path })
-      setProjectTechnologies(techs)
+      // Ensure techs is an array before mapping
+      const techsArray = Array.isArray(techs) ? techs : []
+      const mappedTechs = techsArray.map(t => typeof t === 'string' ? getTechIcon(t) : t).filter(Boolean)
+      setProjectTechnologies(mappedTechs)
 
       // Check for python venv
       try {
@@ -55,8 +59,11 @@ export const useProject = (currentProject, showToast) => {
       }
     } catch (e) {
       showToast(`Scan failed: ${e}`, 'error')
+    } finally {
+      setBusy(false)
+      // Safety fallback — scan-complete event should handle this, but ensure overlay always clears
+      setIsScanning(false)
     }
-    setBusy(false)
   }, [getInvoke, showToast])
 
   const handleSearch = useCallback(async () => {
@@ -128,7 +135,7 @@ export const useProject = (currentProject, showToast) => {
   const handleDelete = useCallback(async (packageName) => {
     if (!currentProject) return
     if (!confirm(`Are you sure you want to uninstall ${packageName}?`)) return
-    
+
     const invoke = await getInvoke()
     setBusy(true)
     try {
@@ -148,6 +155,16 @@ export const useProject = (currentProject, showToast) => {
     }
   }, [currentProject, scanResult, getInvoke, scan, showToast])
 
+  const openFolder = useCallback(async (path) => {
+    if (!path) return
+    const invoke = await getInvoke()
+    try {
+      await invoke('open_folder', { path })
+    } catch (e) {
+      showToast(`Could not open folder: ${e}`, 'error')
+    }
+  }, [getInvoke, showToast])
+
   // Listen for scan events
   useEffect(() => {
     const handleScanComplete = (event) => {
@@ -159,15 +176,17 @@ export const useProject = (currentProject, showToast) => {
       setIsScanning(false)
     }
 
-    let unlisten = () => {}
-    
+    const unlistens = []
+
     if (isTauri()) {
       import('@tauri-apps/api/event').then(({ listen }) => {
         listen('scan-progress', (event) => {
-          const pkg = event.payload.package
+          const pkg = event.payload?.package
+          if (!pkg) return
+          
           setScanResult(prev => {
-            const packages = prev.packages || []
-            const idx = packages.findIndex(p => p.path === pkg.path)
+            const packages = prev?.packages || []
+            const idx = packages.findIndex(p => p && p.path === pkg.path)
             let newPackages
             if (idx >= 0) {
               newPackages = [...packages]
@@ -178,22 +197,22 @@ export const useProject = (currentProject, showToast) => {
             return {
               ...prev,
               packages: newPackages,
-              total_size: newPackages.reduce((s, p) => s + (p.size || 0), 0),
+              total_size: newPackages.reduce((s, p) => s + (p?.size || 0), 0),
               total_count: newPackages.length
             }
           })
-        }).then(u => { unlisten = u })
-        
-        listen('scan-complete', handleScanComplete).then(u => { 
-           const oldUnlisten = unlisten;
-           unlisten = () => { oldUnlisten(); u(); }
-        })
+        }).then(u => unlistens.push(u))
+
+        listen('scan-complete', handleScanComplete).then(u => unlistens.push(u))
       })
     } else {
-      unlisten = setupMockEventListeners({ onScanComplete: handleScanComplete })
+      const u = setupMockEventListeners({ onScanComplete: handleScanComplete })
+      unlistens.push(u)
     }
 
-    return () => unlisten()
+    return () => {
+      unlistens.forEach(u => u())
+    }
   }, [])
 
   // Auto-scan when project changes
@@ -201,12 +220,18 @@ export const useProject = (currentProject, showToast) => {
     if (currentProject && lastScannedPathRef.current !== currentProject.path) {
       scan(currentProject)
       lastScannedPathRef.current = currentProject.path
-      
+
       // Fetch extra details
       getInvoke().then(invoke => {
         invoke('read_package_scripts', { projectPath: currentProject.path })
-          .then(setProjectScripts)
-          .catch(() => {})
+          .then(scripts => {
+            console.log('Fetched scripts for:', currentProject.name, scripts);
+            setProjectScripts(scripts || {});
+          })
+          .catch((err) => { 
+            console.error('Failed to read scripts:', err);
+            setProjectScripts({});
+          })
 
         setIsLoadingAudit(true)
         invoke('run_npm_audit', { projectPath: currentProject.path })
@@ -220,7 +245,7 @@ export const useProject = (currentProject, showToast) => {
           .then(res => {
             setOutdatedCount(Object.keys(res || {}).length)
           })
-          .catch(() => {})
+          .catch(() => { })
       })
     }
   }, [currentProject, scan, getInvoke])
@@ -273,9 +298,10 @@ export const useProject = (currentProject, showToast) => {
     .slice(0, 5)
 
   const filteredPackages = (scanResult?.packages || [])
-    .filter(p => p.name.toLowerCase().includes(filter.toLowerCase()))
+    .filter(p => p && (p.name || '').toLowerCase().includes((filter || '').toLowerCase()))
     .sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      if (!a || !b) return 0
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '')
       if (sortBy === 'size') return (b.size || 0) - (a.size || 0)
       return 0
     })
@@ -310,6 +336,7 @@ export const useProject = (currentProject, showToast) => {
     handleInstall,
     handleUpdate,
     handleDelete,
+    openFolder,
     handleUpdateSelected,
     handleUpdateAll,
     togglePackage,

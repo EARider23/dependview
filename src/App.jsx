@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Toaster, toast as sonnerToast } from 'sonner'
+import { Toaster } from './components/ui/toaster'
+import { useToast } from './components/ui/use-toast'
 import { Zap, Package, Box, Cpu, Settings } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -14,6 +15,7 @@ import SystemPackagesView from './views/SystemPackagesView'
 
 // Components
 import { SettingsDialog } from './components/SettingsDialog'
+import { ImportProgressDialog } from './components/ImportProgressDialog'
 import AnimatedCounter from './components/AnimatedCounter'
 
 import './styles.css'
@@ -52,17 +54,29 @@ function App() {
     accentColor: '#9333ea'
   })
 
+  const { toast } = useToast()
+
   const showToast = (message, type = 'info') => {
-    if (type === 'success') sonnerToast.success(message)
-    else if (type === 'error') sonnerToast.error(message)
-    else sonnerToast.info(message)
+    toast({
+      title: type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Notification',
+      description: message,
+      variant: type === 'success' ? 'success' : type === 'error' ? 'destructive' : 'default',
+    })
   }
 
   const { 
     projects, 
     setProjects,
+    projectViewMode,
+    setProjectViewMode,
+    importingProject,
+    importStage,
+    importPkgCount,
+    importingProjectName,
+    setImportingProject,
     removeProject, 
-    pickFolder 
+    pickFolder,
+    updateProject
   } = useDashboard(showToast)
 
   const handleSaveSettings = (newSettings) => {
@@ -92,8 +106,9 @@ function App() {
       </div>
 
       {/* Global Header */}
-      <header className="bg-white/60 backdrop-blur-md border-b border-white/20 sticky top-0 z-50 shadow-lg shadow-black/5">
-        <div className="max-w-[1600px] mx-auto px-8 h-16 flex items-center justify-between">
+      {!['create-project'].includes(viewMode) && (
+        <header className="bg-white/60 backdrop-blur-md border-b border-white/20 sticky top-0 z-50 shadow-lg shadow-black/5">
+          <div className="max-w-[1600px] mx-auto px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-purple-200">
               <Zap className="w-4 h-4 text-white" />
@@ -117,9 +132,11 @@ function App() {
           </div>
         </div>
       </header>
+      )}
 
       {/* Main Content Area */}
-      <main className="py-8 px-8 max-w-[1600px] mx-auto relative z-10 min-h-screen">
+      <main className="relative z-10 min-h-screen">
+        <div className={viewMode === 'create-project' ? '' : 'py-8 px-8 max-w-[1600px] mx-auto'}>
         
         {/* Tab Bar — Above page content */}
         <AnimatePresence>
@@ -174,6 +191,11 @@ function App() {
                 setCurrentProject={setCurrentProject}
                 setViewMode={setViewMode}
                 showToast={showToast}
+                projects={projects}
+                projectViewMode={projectViewMode}
+                setProjectViewMode={setProjectViewMode}
+                pickFolder={pickFolder}
+                removeProject={removeProject}
               />
             </motion.div>
           )}
@@ -189,8 +211,11 @@ function App() {
             >
               <ProjectDetailsView
                 currentProject={currentProject}
+                setCurrentProject={setCurrentProject}
                 showToast={showToast}
                 setViewMode={setViewMode}
+                removeProject={removeProject}
+                updateProject={updateProject}
                 AnimatedCounter={AnimatedCounter}
                 formatBytes={formatBytes}
               />
@@ -246,7 +271,17 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </main>
+
+      {/* Import Analysis Dialog */}
+      <ImportProgressDialog
+        open={importingProject}
+        projectName={importingProjectName}
+        stage={importStage}
+        packageCount={importPkgCount}
+        onOpenChange={setImportingProject}
+      />
 
       {/* Settings Dialog — includes Maintenance & History */}
       <SettingsDialog
@@ -262,23 +297,7 @@ function App() {
         setViewMode={setViewMode}
       />
 
-      <Toaster
-        position="top-right"
-        richColors
-        closeButton
-        offset="90px"
-        toastOptions={{
-          style: {
-            background: '#ffffff',
-            border: '1px solid #f3f4f6',
-            borderRadius: '12px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            padding: '14px 18px',
-            fontSize: '13px',
-            fontWeight: '500',
-          },
-        }}
-      />
+      <Toaster />
     </div>
   )
 }

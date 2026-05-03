@@ -86,6 +86,7 @@ export function ProjectCardStack({ projects, onClick, onRemove }) {
                     const isTop = order[0] === i
                     return (
                         <div 
+                            key={project.path || i}
                             id={`project-card-${i}`}
                             className="project-stack-card absolute inset-0 w-full transform-gpu origin-bottom cursor-pointer"
                             onClick={(e) => {

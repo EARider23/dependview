@@ -1,12 +1,12 @@
 import React, { useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, FolderOpen, Layers, Square, Menu, Zap } from 'lucide-react'
+import { Plus, FolderOpen, Layers, Square, Menu, Zap, Box } from 'lucide-react'
 import { gsap } from 'gsap'
 import { Button } from '../components/ui/button'
 import { ProjectCard } from '../components/ProjectCard'
 import { ProjectCardStack } from '../components/ProjectCardStack'
 
-import { useDashboard } from '../hooks/useDashboard'
+
 
 // Stagger container variants
 const containerVariants = {
@@ -22,26 +22,32 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 16, scale: 0.96 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     scale: 1,
     transition: { type: 'spring', stiffness: 260, damping: 24 }
   },
 }
 
-const DashboardView = ({ 
-  setCurrentProject, 
+const DashboardView = ({
+  setCurrentProject,
   setViewMode,
-  showToast
+  showToast,
+  projects,
+  projectViewMode,
+  setProjectViewMode,
+  pickFolder,
+  removeProject
 }) => {
-  const {
-    projects,
-    projectViewMode,
-    setProjectViewMode,
-    pickFolder,
-    removeProject
-  } = useDashboard(showToast)
+
+  const handleImportProject = async () => {
+    const project = await pickFolder()
+    if (project) {
+      setCurrentProject(project)
+      setViewMode('project')
+    }
+  }
 
   const emptyIconRef = useRef(null)
 
@@ -69,7 +75,7 @@ const DashboardView = ({
     <div>
       {/* Title & Actions Section */}
       {/* Title & Actions Section */}
-      <motion.div 
+      <motion.div
         className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -81,20 +87,20 @@ const DashboardView = ({
               <Layers className="w-4 h-4 text-white" />
             </div>
             <h2 className="text-2xl font-black tracking-tight text-gray-900 flex items-center">
-              Precision <span className="text-purple-600 ml-1">Engine</span>
+              Project <span className="text-purple-600 ml-1">Manager</span>
             </h2>
-            <motion.div 
-              className="bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100 hidden sm:flex items-center ml-1"
+            <motion.div
+              className="bg-purple-50 px-2 h-5 rounded-md border border-purple-100 hidden sm:flex items-center justify-center ml-3 translate-y-[2px]"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3, type: 'spring', stiffness: 400, damping: 15 }}
             >
-                <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest leading-none mt-0.5">Dashboard</span>
+              <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest leading-none">Inventory</span>
             </motion.div>
           </div>
         </div>
 
-        <motion.div 
+        <motion.div
           className="flex flex-wrap gap-3 items-center w-full md:w-auto"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -111,7 +117,7 @@ const DashboardView = ({
 
           {/* Import Project */}
           <Button
-            onClick={pickFolder}
+            onClick={handleImportProject}
             size="lg"
             className="flex-1 md:flex-none h-11 px-6 bg-white text-gray-900 border border-gray-100 shadow-sm rounded-xl transition-all active:scale-95 font-bold no-hover hover:border-gray-200 hover:bg-gray-50"
           >
@@ -124,10 +130,9 @@ const DashboardView = ({
               <button
                 key={mode}
                 onClick={() => setProjectViewMode(mode)}
-                className={`relative z-10 w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-200 no-hover ${
-                    projectViewMode === mode 
-                    ? 'text-purple-600' 
-                    : 'text-gray-400 hover:text-gray-600'
+                className={`relative z-10 w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-200 no-hover ${projectViewMode === mode
+                  ? 'text-purple-600'
+                  : 'text-gray-400 hover:text-gray-600'
                   }`}
               >
                 {/* Animated view mode pill */}
@@ -149,55 +154,96 @@ const DashboardView = ({
       </motion.div>
 
       {/* Centered Text Divider */}
-      <motion.div 
+      <motion.div
         className="flex items-center gap-4 mb-10 w-full"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.8 }}
       >
         <div className="h-[1px] bg-gradient-to-r from-transparent to-gray-200 flex-1"></div>
-        <span className="text-gray-400 font-bold text-xs uppercase tracking-widest whitespace-nowrap">Manage Inventory</span>
+        <span className="text-gray-400 font-bold text-xs tracking-widest whitespace-nowrap">Manage Inventory</span>
         <div className="h-[1px] bg-gradient-to-l from-transparent to-gray-200 flex-1"></div>
       </motion.div>
 
       <div className="mb-12">
         {projects.length === 0 ? (
-          <motion.div 
-            className="relative group overflow-hidden"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 24 }}
+          <motion.div
+            className="relative py-12 px-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
           >
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-purple-500/5 blur-[100px] rounded-full pointer-events-none group-hover:bg-purple-500/10 transition-colors duration-1000"></div>
+            {/* Minimal Drop Zone Container */}
+            <motion.div
+              onClick={pickFolder}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                // Tauri handles file drops via window events usually, 
+                // but we'll stick to the click-to-pick for reliability 
+                // unless the user specifically asks for native tauri drop listener
+                pickFolder()
+              }}
+              className="relative group cursor-pointer"
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+            >
+              {/* Animated Dashed Border */}
+              <div className="absolute inset-0 rounded-[3rem] border-2 border-dashed border-gray-200 group-hover:border-purple-400 group-hover:bg-purple-50/30 transition-all duration-500" />
 
-            <div className="text-center py-24 glass-card rounded-[2.5rem] relative z-10 flex flex-col items-center">
-              <div 
-                ref={emptyIconRef}
-                className="w-20 h-20 bg-white rounded-2xl shadow-md flex items-center justify-center mb-6 border border-purple-50"
-              >
-                <FolderOpen className="w-8 h-8 text-purple-600" />
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">No Projects Loaded</h3>
-              <p className="text-gray-400 mb-8 max-w-sm mx-auto font-bold text-xs uppercase tracking-widest">
-                Import a project folder or create a new one to begin
-              </p>
+              {/* Inner Content */}
+              <div className="relative z-10 flex flex-col items-center justify-center py-32 px-12 text-center">
+                {/* Floating Icon */}
+                <motion.div
+                  className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-10 border border-gray-100 group-hover:border-purple-200 transition-colors"
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <div className="relative">
+                    <FolderOpen className="w-10 h-10 text-gray-400 group-hover:text-purple-600 transition-colors" />
+                    <motion.div
+                      className="absolute -top-8 -right-8 w-6 h-6 bg-purple-600 rounded-lg flex items-center justify-center shadow-lg"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <Plus className="w-3 h-3 text-white" />
+                    </motion.div>
+                  </div>
+                </motion.div>
 
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => setViewMode('create-project')}
-                  size="lg"
-                  className="h-12 px-8 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-purple-200 transition-all active:scale-95 no-hover"
-                >
-                  <Plus className="w-4 h-4 mr-3" /> Create Project
-                </Button>
-                <Button
-                  onClick={pickFolder}
-                  size="lg"
-                  className="h-12 px-8 bg-white text-gray-700 border border-gray-200 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-sm transition-all active:scale-95 hover:border-purple-200 no-hover"
-                >
-                  <FolderOpen className="w-4 h-4 mr-3" /> Select Folder
-                </Button>
+                <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tighter">
+                  Import Your <span className="text-purple-600">Project</span>
+                </h2>
+                <p className="text-gray-400 font-bold text-[11px] uppercase tracking-[0.3em] mb-8">
+                  Initialize your local Project
+                </p>
+
+                <div className="flex flex-col items-center gap-2">
+                  <span className="px-4 py-2 bg-gray-100 rounded-full text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:bg-purple-100 group-hover:text-purple-700 transition-colors">
+                    Click or Drag Folder Here
+                  </span>
+                </div>
               </div>
+
+              {/* Decorative Corner Accents */}
+              <div className="absolute top-8 left-8 w-4 h-4 border-t-2 border-l-2 border-gray-200 group-hover:border-purple-400 transition-colors rounded-tl-lg" />
+              <div className="absolute top-8 right-8 w-4 h-4 border-t-2 border-r-2 border-gray-200 group-hover:border-purple-400 transition-colors rounded-tr-lg" />
+              <div className="absolute bottom-8 left-8 w-4 h-4 border-b-2 border-l-2 border-gray-200 group-hover:border-purple-400 transition-colors rounded-bl-lg" />
+              <div className="absolute bottom-8 right-8 w-4 h-4 border-b-2 border-r-2 border-gray-200 group-hover:border-purple-400 transition-colors rounded-br-lg" />
+            </motion.div>
+
+            {/* Sub-hints */}
+            <div className="mt-12 flex items-center justify-center gap-8 text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+              <span className="flex items-center gap-2 group cursor-help hover:text-gray-400 transition-colors">
+                <Zap className="w-3 h-3" /> Auto-Detect Tech
+              </span>
+              <span className="flex items-center gap-2 group cursor-help hover:text-gray-400 transition-colors">
+                <Box className="w-3 h-3" /> Dependency Audit
+              </span>
+              <span className="flex items-center gap-2 group cursor-help hover:text-gray-400 transition-colors">
+                <Layers className="w-3 h-3" /> System Hygiene
+              </span>
             </div>
           </motion.div>
         ) : (
@@ -230,11 +276,11 @@ const DashboardView = ({
                 >
                   {projects.map((p, i) => (
                     <motion.div key={p.path} variants={itemVariants}>
-                      <ProjectCard 
-                        project={p} 
-                        viewMode="grid" 
-                        onClick={() => handleSelectProject(p)} 
-                        onRemove={(path) => removeProject(path)} 
+                      <ProjectCard
+                        project={p}
+                        viewMode="grid"
+                        onClick={() => handleSelectProject(p)}
+                        onRemove={(path) => removeProject(path)}
                       />
                     </motion.div>
                   ))}
@@ -252,11 +298,11 @@ const DashboardView = ({
                 >
                   {projects.map((p) => (
                     <motion.div key={p.path} variants={itemVariants}>
-                      <ProjectCard 
-                        project={p} 
-                        viewMode="list" 
-                        onClick={() => handleSelectProject(p)} 
-                        onRemove={(path) => removeProject(path)} 
+                      <ProjectCard
+                        project={p}
+                        viewMode="list"
+                        onClick={() => handleSelectProject(p)}
+                        onRemove={(path) => removeProject(path)}
                       />
                     </motion.div>
                   ))}

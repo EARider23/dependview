@@ -181,12 +181,13 @@ export const mockInvoke = async (cmd, args = {}) => {
     }
 
     case 'read_package_scripts': {
+      const folder = args.projectPath || ''
+      if (folder.includes('mobile')) return {} // Mock a project with no scripts
       return {
         "dev": "vite",
         "build": "vite build",
-        "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
         "preview": "vite preview",
-        "tauri": "tauri"
+        "lint": "eslint ."
       }
     }
 
@@ -249,17 +250,6 @@ export const mockInvoke = async (cmd, args = {}) => {
       if (folder.includes('api')) return ['express', 'mongodb', 'firebase']
       if (folder.includes('mobile')) return ['react-native', 'expo']
       return ['react', 'vite']
-    }
-
-    case 'read_package_scripts': {
-      const folder = args.projectPath || ''
-      if (folder.includes('mobile')) return {} // Mock a project with no scripts
-      return {
-        "dev": "vite",
-        "build": "vite build",
-        "preview": "vite preview",
-        "lint": "eslint ."
-      }
     }
 
     case 'run_package_script': {

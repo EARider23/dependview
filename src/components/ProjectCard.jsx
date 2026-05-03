@@ -64,8 +64,10 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 className="group relative rounded-[1.5rem] glass-card shimmer-hover hover:bg-white/60 transition-all duration-300 cursor-pointer overflow-hidden flex items-center gap-4 p-3"
             >
                 <div className="relative shrink-0">
-                    <div ref={logoRef} className="w-12 h-12 rounded-[1rem] bg-[#FFC107] shadow-md flex items-center justify-center text-white border-2 border-white/40 overflow-hidden group-hover:scale-105 transition-transform">
-                        {project.logo ? (
+                    <div ref={logoRef} className="w-12 h-12 rounded-[1rem] bg-indigo-50 shadow-sm flex items-center justify-center text-indigo-500 border-2 border-white/40 overflow-hidden group-hover:scale-105 transition-transform">
+                        {project.image ? (
+                            <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+                        ) : project.logo ? (
                             <img src={convertFileSrc(project.logo)} alt={project.name} className="w-full h-full object-cover" />
                         ) : (
                             <div className="font-black text-xl">
@@ -152,8 +154,10 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 {/* Center Content: Logo & Title */}
                 <div className="flex-1 flex flex-col items-center justify-center relative z-10 mt-1">
                     <div className="relative mb-4 group-hover:-translate-y-1.5 transition-transform duration-500">
-                        <div className="w-28 h-28 rounded-[2rem] bg-[#FFC107] shadow-xl flex items-center justify-center text-white overflow-hidden border-[4px] border-white/60">
-                            {project.logo ? (
+                        <div className="w-28 h-28 rounded-[2rem] bg-indigo-50 shadow-xl flex items-center justify-center text-indigo-500 overflow-hidden border-[4px] border-white/60">
+                            {project.image ? (
+                                <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+                            ) : project.logo ? (
                                 <img src={convertFileSrc(project.logo)} alt={project.name} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="font-black text-5xl">
@@ -259,11 +263,13 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
 
             {/* Logo Section */}
             <div className="mb-4 mt-2">
-                <div ref={logoRef} className="w-20 h-20 rounded-[1.8rem] bg-[#FFC107] shadow-lg flex items-center justify-center overflow-hidden border-4 border-white/60">
-                    {project.logo ? (
+                <div ref={logoRef} className="w-20 h-20 rounded-[1.8rem] bg-indigo-50 shadow-lg flex items-center justify-center overflow-hidden border-4 border-white/60 text-indigo-500">
+                    {project.image ? (
+                        <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+                    ) : project.logo ? (
                         <img src={convertFileSrc(project.logo)} alt={project.name} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="text-white font-black text-3xl">
+                        <div className="font-black text-3xl">
                             {project.name?.charAt(0).toUpperCase() || 'P'}
                         </div>
                     )}
