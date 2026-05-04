@@ -13,7 +13,7 @@ import {
     DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 
-export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, onRevert, hasUpdate, latestVersion, isInstalling, installProgress, viewMode = 'grid', verified = false, versionHistory = [], projectPath, venvPath, openFolder, formatBytes }) => {
+export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, onRevert, hasUpdate, latestVersion, isInstalling, installProgress, installType, viewMode = 'grid', verified = false, versionHistory = [], projectPath, venvPath, openFolder, formatBytes }) => {
     // Status Logic - strictly check for true
     const isActive = pkg.is_declared === true
     const managerIcon = getTechIcon(pkg.manager)
@@ -43,7 +43,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     <Checkbox
                         checked={selected}
                         onCheckedChange={handleToggle}
-                        className="h-4 w-4 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
+                        className="h-4 w-4 border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
                     />
 
                     <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center p-1.5 flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
@@ -91,14 +91,32 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     </div>
 
                     <div className="flex items-center gap-1">
-                        {hasUpdate && (
-                            <Button
-                                size="sm"
-                                onClick={handleUpdate}
-                                className="h-7 px-2 bg-amber-400 hover:bg-amber-500 text-black text-[9px] font-black uppercase rounded-lg border border-amber-500/20 shadow-sm transition-all active:scale-95 mr-1"
-                            >
-                                <ArrowUp className="w-3 h-3 mr-1" /> Update
-                            </Button>
+                        {(hasUpdate || isInstalling) && (
+                            <div className="mr-1">
+                                {isInstalling ? (
+                                    <div className="flex items-center gap-2.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-300 min-w-[180px] shadow-sm">
+                                        <RefreshCw className="w-3 h-3 text-amber-600 animate-spin" />
+                                        <div className="flex-1 h-2 bg-white rounded-full overflow-hidden border border-amber-200 p-[1px] shadow-inner">
+                                            <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${installProgress}%` }}
+                                                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                                            />
+                                        </div>
+                                        <span className="text-[8px] font-black text-amber-800 uppercase tracking-tighter animate-pulse whitespace-nowrap">
+                                            {installType === 'revert' ? 'Reverting...' : installType === 'delete' ? 'Uninstalling...' : 'Updating...'}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        onClick={handleUpdate}
+                                        className="h-7 px-2 bg-amber-400 hover:bg-amber-500 text-black text-[9px] font-black uppercase rounded-lg border border-amber-500/20 shadow-sm transition-all active:scale-95"
+                                    >
+                                        <ArrowUp className="w-3 h-3 mr-1" /> Update
+                                    </Button>
+                                )}
+                            </div>
                         )}
                         <div className="flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 group-hover:bg-white transition-colors">
                             {managerIcon.image ? (
@@ -157,7 +175,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     <Checkbox
                         checked={selected}
                         onCheckedChange={handleToggle}
-                        className="h-4.5 w-4.5 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
+                        className="h-5 w-5 border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 shadow-sm"
                     />
                     <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-300 ${isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
                         <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`} />
@@ -218,10 +236,33 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                         )}
                     </div>
                 </div>
-            </div>
+            </div>            {/* Bottom: Metrics & Path */}
+            <div className="space-y-3">
+                {isInstalling && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="px-1 space-y-2"
+                    >
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shadow-sm border border-amber-200">
+                                <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                            </div>
+                            <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest animate-pulse">
+                                {installType === 'revert' ? 'Reverting' : installType === 'delete' ? 'Uninstalling' : 'Updating'}
+                            </span>
+                            <span className="ml-auto text-[10px] font-bold font-mono text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">{installProgress}%</span>
+                        </div>
+                        <div className="w-full h-2.5 bg-amber-50 rounded-full overflow-hidden border border-amber-200 p-[1.5px] shadow-inner">
+                            <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${installProgress}%` }}
+                                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.4)]"
+                            />
+                        </div>
+                    </motion.div>
+                )}
 
-            {/* Bottom: Metrics & Path */}
-            <div className="space-y-4">
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-purple-100 transition-all duration-300">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 pr-3 border-r border-slate-200">
@@ -236,13 +277,16 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     </div>
 
                     {hasUpdate && !isInstalling && (
-                        <Button
-                            size="sm"
-                            onClick={handleUpdate}
-                            className="h-8 px-2.5 bg-amber-400 hover:bg-amber-500 text-black text-[10px] font-black uppercase rounded-xl shadow-lg shadow-amber-200/50 border border-amber-500/20 transition-all active:scale-95"
-                        >
-                            <ArrowUp className="w-3.5 h-3.5 mr-1" /> Update
-                        </Button>
+                        <div className="flex-shrink-0">
+                            <Button
+                                size="sm"
+                                onClick={handleUpdate}
+                                className="h-8 px-3 bg-amber-400 hover:bg-amber-500 text-black text-[10px] font-black uppercase rounded-xl shadow-lg shadow-amber-200/50 border border-amber-500/20 transition-all active:scale-95 group/up"
+                            >
+                                <ArrowUp className="w-3.5 h-3.5 mr-1 group-hover/up:-translate-y-0.5 transition-transform" /> 
+                                Update
+                            </Button>
+                        </div>
                     )}
                 </div>
 
@@ -255,15 +299,6 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                 </button>
             </div>
 
-            {isInstalling && (
-                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-100 overflow-hidden">
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${installProgress}%` }}
-                        className="h-full bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.5)]"
-                    />
-                </div>
-            )}
         </div>
     )
 })

@@ -13,6 +13,14 @@ import { PackageCard } from '../components/PackageCard'
 import { PackageCardSkeleton } from '../components/PackageCardSkeleton'
 import { getTechIcon } from '../assets/iconLinks'
 import { useProject } from '../hooks/useProject'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../components/ui/dialog"
 
 // High-performance Lazy Wrapper with Shimmer
 const LazyPackageCard = React.memo((props) => {
@@ -67,6 +75,7 @@ const ProjectDetailsView = React.memo(({
     outdatedCount,
     venvPath,
     isScanning,
+    isSilentScanning,
     isLoadingAudit,
     busy,
     availableUpdates,
@@ -91,6 +100,8 @@ const ProjectDetailsView = React.memo(({
     handleDelete,
     openFolder,
     handleUpdateAll,
+    handleUpdateSelected,
+    handleDeleteSelected,
     togglePackage,
     installingPackagesHasPath,
     installingPackages,
@@ -139,6 +150,13 @@ const ProjectDetailsView = React.memo(({
     totalVulns: 0
   });
 
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = React.useState(false);
+
+  const confirmBulkDelete = () => {
+    setShowBulkDeleteConfirm(false);
+    handleDeleteSelected();
+  };
+
   React.useEffect(() => {
     if (!isScanning && scanResult) {
       const timer = setTimeout(() => {
@@ -150,7 +168,7 @@ const ProjectDetailsView = React.memo(({
           highCount: auditResult?.metadata?.vulnerabilities?.high || 0,
           totalVulns: auditResult?.metadata?.vulnerabilities?.total || 0
         });
-      }, 300);
+      }, 600); // 600ms delay for dramatic reveal after overlay exit
       return () => clearTimeout(timer);
     } else if (isScanning) {
       setDisplayMetrics({
@@ -163,6 +181,22 @@ const ProjectDetailsView = React.memo(({
       });
     }
   }, [isScanning, scanResult, auditResult, outdatedCount]);
+
+  // Automatic Silent Refresh: Keep dependency data fresh every 60 seconds
+  React.useEffect(() => {
+    if (!currentProject) return;
+
+    const interval = setInterval(() => {
+      // Only refresh if not already busy to avoid overlapping scans
+      if (!busy) {
+        console.log('[ProjectDetailsView] Automatic silent refresh triggered');
+        scan(currentProject, { silent: true });
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [currentProject, scan, busy]);
+
 
   const handleUninstall = useCallback(() => {
     if (confirmDeleteText === `delete - ${currentProject?.name}`) {
@@ -222,7 +256,7 @@ const ProjectDetailsView = React.memo(({
 
         {/* Project Analysis Overlay (Opening Project) */}
         <AnimatePresence>
-          {isScanning && (
+          {isScanning && !isSilentScanning && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -847,33 +881,35 @@ const ProjectDetailsView = React.memo(({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <Input
-                      placeholder="Search packages..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      className="h-9 w-48 pl-9 bg-white border-slate-200 rounded-xl text-[12px] font-medium focus:ring-1 focus:ring-slate-200 transition-all"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSearch}
-                    disabled={busy || !searchQuery}
-                    className="h-10 px-5 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-md active:scale-95"
-                  >
-                    {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
-                  </Button>
-                  {searchResults && searchResults.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 group/input">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within/input:text-indigo-500 transition-colors" />
+                      <Input
+                        placeholder="Search packages..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        className="pl-11 h-10 bg-slate-50 border-slate-100 rounded-xl text-[13px] font-bold focus:bg-white focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                      />
+                    </div>
                     <Button
-                      variant="outline"
-                      onClick={() => setSearchResults([])}
-                      className="h-9 px-3 border-slate-200 bg-white text-slate-500 hover:bg-slate-50 rounded-xl font-bold text-[11px] transition-all"
+                      onClick={handleSearch}
+                      disabled={busy || !searchQuery}
+                      className="h-10 px-5 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-md active:scale-95"
                     >
-                      Clear
+                      {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
                     </Button>
-                  )}
+                    {searchResults && searchResults.length > 0 && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setSearchResults([])}
+                        className="h-10 px-4 border-slate-200 bg-white text-slate-500 hover:bg-slate-50 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -881,31 +917,90 @@ const ProjectDetailsView = React.memo(({
               <div className="p-6 bg-white flex-1">
                 <div className="space-y-2 overflow-y-auto max-h-[180px] pr-2 custom-scrollbar">
                   {searchResults && searchResults.length > 0 ? (
-                    searchResults.map((result) => (
-                      <div
-                        key={result.name}
-                        className="flex items-center justify-between p-3 bg-slate-50 hover:bg-white hover:border-indigo-100 rounded-2xl border border-transparent transition-all group shadow-sm hover:shadow-md"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center shadow-sm">
-                            <img
-                              src={`https://img.icons8.com/color/48/000000/npm.png`}
-                              className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all"
-                            />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[13px] font-bold text-slate-800">{result.name}</span>
-                            <span className="text-[10px] font-medium font-mono text-slate-400 uppercase">v{result.version}</span>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleInstall(result.name)}
-                          className="h-8 w-8 p-0 rounded-lg bg-white border border-slate-100 hover:bg-slate-900 text-slate-500 hover:text-white transition-all shadow-none"
+                    searchResults.map((result) => {
+                      const name = result.package?.name || result.name;
+                      const version = result.package?.version || result.version;
+                      const description = result.package?.description || result.description;
+
+                      return (
+                        <div
+                          key={name}
+                          className="flex items-center justify-between p-3 bg-slate-50 hover:bg-white hover:border-indigo-100 rounded-2xl border border-transparent transition-all group shadow-sm hover:shadow-md"
                         >
-                          <Download className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center shadow-sm shrink-0">
+                              <img
+                                src={`https://img.icons8.com/color/48/000000/npm.png`}
+                                className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all"
+                              />
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-[13px] font-bold text-slate-800 truncate leading-tight">
+                                {name}
+                              </span>
+                              {description && (
+                                <p className="text-[10px] text-slate-400 truncate max-w-[300px] font-medium leading-none mt-0.5">
+                                  {description}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[10px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100/50">
+                                  v{version}
+                                </span>
+                                {name?.includes('/') && (
+                                  <Badge className="bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md">Verified Registry Match</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {installingPackages.has(name) ? (
+                            <div className="flex flex-col items-end gap-2 min-w-[120px]">
+                              <div className="flex items-center gap-2">
+                                <div className="flex gap-1">
+                                  <motion.div
+                                    animate={{ scale: [1, 1.5, 1] }}
+                                    transition={{ repeat: Infinity, duration: 1 }}
+                                    className="w-1 h-1 bg-indigo-600 rounded-full"
+                                  />
+                                  <motion.div
+                                    animate={{ scale: [1, 1.5, 1] }}
+                                    transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+                                    className="w-1 h-1 bg-indigo-600 rounded-full"
+                                  />
+                                  <motion.div
+                                    animate={{ scale: [1, 1.5, 1] }}
+                                    transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+                                    className="w-1 h-1 bg-indigo-600 rounded-full"
+                                  />
+                                </div>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[9px] font-black text-indigo-700 uppercase tracking-tight">Deploying...</span>
+                                  {installingPackages.get(name)?.lastLog && (
+                                    <span className="text-[7px] font-bold text-slate-400 truncate max-w-[150px] text-right uppercase tracking-tighter">
+                                      {installingPackages.get(name).lastLog}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="w-full h-1.5 bg-indigo-50 rounded-full overflow-hidden border border-indigo-100 p-[0.5px]">
+                                <motion.div
+                                  initial={{ width: "5%" }}
+                                  animate={{ width: `${installingPackages.get(name)?.progress || 5}%` }}
+                                  className="h-full bg-indigo-600 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.4)]"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => handleInstall(name, version)}
+                              className="h-9 w-9 p-0 rounded-xl bg-white border border-slate-100 hover:bg-slate-900 text-slate-500 hover:text-white transition-all shadow-sm group-hover:scale-110 active:scale-95 group-hover:shadow-indigo-100"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center border border-dashed border-slate-100 rounded-2xl py-8 opacity-80 bg-slate-100/50">
                       <Box className="w-5 h-5 text-slate-300 mb-2" />
@@ -1021,23 +1116,74 @@ const ProjectDetailsView = React.memo(({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 p-1 bg-slate-50 rounded-xl border border-slate-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setPackageView('grid')}
-                className={`w-8 h-8 rounded-lg transition-all ${packageView === 'grid' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setPackageView('list')}
-                className={`w-8 h-8 rounded-lg transition-all ${packageView === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-              >
-                <List className="w-4 h-4" />
-              </Button>
+            <div className="flex items-center gap-2">
+              {/* Update All Button */}
+              {outdatedCount > 0 && (
+                <Button
+                  onClick={handleUpdateAll}
+                  disabled={busy}
+                  className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />
+                  Update All
+                </Button>
+              )}
+
+              {/* Selected Actions */}
+              <AnimatePresence>
+                {selectedPackages.size > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="flex items-center gap-1.5 p-1 bg-slate-50 rounded-xl border border-slate-100"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const packagesToUpdate = Array.from(selectedPackages).map(path =>
+                          filteredPackages.find(p => p.path === path)
+                        ).filter(Boolean);
+                        handleUpdateSelected(packagesToUpdate);
+                      }}
+                      className="h-8 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 transition-all flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Update Selected ({selectedPackages.size})
+                    </Button>
+                    <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowBulkDeleteConfirm(true)}
+                      className="h-8 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 transition-all flex items-center gap-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete Selected
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-center gap-1.5 p-1 bg-slate-50 rounded-xl border border-slate-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPackageView('grid')}
+                  className={`w-8 h-8 rounded-lg transition-all ${packageView === 'grid' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPackageView('list')}
+                  className={`w-8 h-8 rounded-lg transition-all ${packageView === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </motion.div>
 
@@ -1064,11 +1210,41 @@ const ProjectDetailsView = React.memo(({
                 <span className="text-[10px] font-bold font-mono tracking-tighter text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
                   {scanResult?.packages?.filter(p => p.is_declared).length || 0} MODULES
                 </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    scan(currentProject, { silent: true });
+                  }}
+                  disabled={busy}
+                  className="w-8 h-8 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />
+                </Button>
                 {showCore ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
               </div>
             </button>
 
-            <div className={`p-4 pt-3 mt-4 ${!showCore ? 'hidden' : ''}`}>
+            <div className={`p-4 pt-3 mt-4 ${!showCore ? 'hidden' : ''} relative`}>
+              <AnimatePresence>
+                {isSilentScanning && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl"
+                  >
+                    <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-2xl shadow-xl border border-indigo-50">
+                      <div className="w-8 h-8 border-3 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Syncing...</span>
+                        <span className="text-[8px] font-bold uppercase tracking-tight text-slate-400">Updating Stack View</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className={packageView === 'grid'
                 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                 : "flex flex-col gap-3"
@@ -1088,7 +1264,8 @@ const ProjectDetailsView = React.memo(({
                     latestVersion={availableUpdates.get(pkg.name)}
                     versionHistory={packageVersionHistory.get(pkg.name) || []}
                     isInstalling={installingPackages.get(pkg.name) !== undefined}
-                    installProgress={installingPackages.get(pkg.name)}
+                    installProgress={installingPackages.get(pkg.name)?.progress}
+                    installType={installingPackages.get(pkg.name)?.type}
                     openFolder={openFolder}
                     formatBytes={formatBytes}
                   />
@@ -1120,11 +1297,41 @@ const ProjectDetailsView = React.memo(({
                 <span className="text-[10px] font-bold font-mono tracking-tighter text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
                   {subPackages.length} MODULES
                 </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    scan(currentProject, { silent: true });
+                  }}
+                  disabled={busy}
+                  className="w-8 h-8 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-slate-900 transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />
+                </Button>
                 {showSub ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
               </div>
             </button>
 
-            <div className={`p-4 pt-5 pb-4 ${!showSub ? 'hidden' : ''}`}>
+            <div className={`p-4 pt-5 pb-4 ${!showSub ? 'hidden' : ''} relative`}>
+              <AnimatePresence>
+                {isSilentScanning && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl"
+                  >
+                    <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-2xl shadow-xl border border-slate-50">
+                      <div className="w-8 h-8 border-3 border-slate-100 border-t-slate-900 rounded-full animate-spin" />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">Syncing Tree</span>
+                        <span className="text-[8px] font-bold uppercase tracking-tight text-slate-400">Updating Dependencies</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className={packageView === 'grid'
                 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                 : "flex flex-col gap-3"
@@ -1144,7 +1351,8 @@ const ProjectDetailsView = React.memo(({
                     latestVersion={availableUpdates.get(pkg.name)}
                     versionHistory={packageVersionHistory.get(pkg.name) || []}
                     isInstalling={installingPackages.get(pkg.name) !== undefined}
-                    installProgress={installingPackages.get(pkg.name)}
+                    installProgress={installingPackages.get(pkg.name)?.progress}
+                    installType={installingPackages.get(pkg.name)?.type}
                     openFolder={openFolder}
                     formatBytes={formatBytes}
                   />
@@ -1155,6 +1363,43 @@ const ProjectDetailsView = React.memo(({
         </div>
 
       </div>
+
+      {/* Custom Bulk Delete Confirmation Dialog */}
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent className="sm:max-w-[400px] border-rose-100 shadow-2xl shadow-rose-500/10 rounded-[2rem] p-0 overflow-hidden">
+          <div className="bg-rose-50/50 p-8 border-b border-rose-100 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-3xl bg-white border-2 border-rose-200 flex items-center justify-center shadow-sm shadow-rose-200/50">
+              <Trash2 className="w-8 h-8 text-rose-500 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-[18px] font-black uppercase tracking-tight text-slate-900">Confirm Bulk Action</DialogTitle>
+              <DialogDescription className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">Security Clearance Required</DialogDescription>
+            </div>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <p className="text-[14px] text-slate-600 font-medium leading-relaxed text-center">
+              You are about to uninstall <span className="font-black text-rose-600 px-2 py-0.5 bg-rose-50 rounded-md">{selectedPackages.size} packages</span> from your project. This action is destructive and cannot be undone.
+            </p>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100"
+              >
+                Abort Action
+              </Button>
+              <Button
+                onClick={confirmBulkDelete}
+                className="flex-1 h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-200 transition-all active:scale-95"
+              >
+                Confirm Delete
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 })

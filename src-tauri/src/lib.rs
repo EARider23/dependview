@@ -101,12 +101,19 @@ fn scan_node_modules(base_path: &Path) -> Vec<InstalledPackage> {
         
         // Handle scoped packages (@org/pkg)
         if name.starts_with('@') {
+          println!("[scan] Found scope folder: {}", name);
           if let Ok(scoped_entries) = fs::read_dir(&path) {
             for scoped_entry in scoped_entries.flatten() {
               let scoped_path = scoped_entry.path();
               if scoped_path.is_dir() {
-                let scoped_name = format!("{}/{}", name, scoped_entry.file_name().to_string_lossy());
+                let sub_name = scoped_entry.file_name().to_string_lossy().to_string();
+                let scoped_name = format!("{}/{}", name, sub_name);
+                println!("[scan] Found scoped package: {}", scoped_name);
+                
                 let pkg_json = scoped_path.join("package.json");
+                if !pkg_json.exists() {
+                  println!("[scan] WARNING: package.json not found for {}", scoped_name);
+                }
                 let version = read_package_version(&pkg_json);
                 let size = calculate_dir_size(&scoped_path);
                 
@@ -1711,6 +1718,30 @@ fn detect_venv(project_path: &Path) -> Option<PathBuf> {
   None
 }
 
+// Detect which package manager to use for a project
+#[tauri::command]
+fn detect_package_manager(project_path: String) -> String {
+  let path = Path::new(&project_path);
+  
+  if path.join("pnpm-lock.yaml").exists() { return "pnpm".to_string(); }
+  if path.join("bun.lockb").exists() || path.join("bun.lock").exists() { return "bun".to_string(); }
+  if path.join("yarn.lock").exists() { return "yarn".to_string(); }
+  if path.join("package-lock.json").exists() { return "npm".to_string(); }
+  
+  if path.join("requirements.txt").exists() || path.join("pyproject.toml").exists() || detect_venv(path).is_some() {
+    return "pip".to_string();
+  }
+  
+  if path.join("pubspec.yaml").exists() { return "pub".to_string(); }
+  if path.join("go.mod").exists() { return "go".to_string(); }
+  if path.join("Cargo.toml").exists() { return "cargo".to_string(); }
+  
+  // Default to npm if it's a web project (has package.json)
+  if path.join("package.json").exists() { return "npm".to_string(); }
+  
+  "npm".to_string()
+}
+
 // Install package command
 #[tauri::command]
 fn install_package(
@@ -1722,121 +1753,77 @@ fn install_package(
 ) -> Result<String, String> {
   use std::process::Command;
   
+  // Sanitize: ensure package_name is a single, valid identifier (no spaces that would cause multi-install)
+  let sanitized_name = package_name.trim().to_string();
+  if sanitized_name.contains(' ') {
+    return Err(format!("Invalid package name: '{}'. Package names cannot contain spaces.", sanitized_name));
+  }
+  
+  eprintln!("[install_package] Manager: {}, Package: '{}', Path: {:?}, Global: {}", 
+    package_manager, sanitized_name, project_path, is_global);
+
   let mut cmd = match package_manager.as_str() {
     "npm" => {
-      // Check for bun or pnpm first
-      let has_bun = Command::new("bun").arg("--version").output().is_ok();
-      let has_pnpm = Command::new("pnpm").arg("--version").output().is_ok();
-
-      let c = if has_bun {
-         let mut cmd = if cfg!(target_os = "windows") {
-          let mut c = Command::new("cmd");
-          c.args(["/c", "bun"]);
-          c
-        } else {
-          Command::new("bun")
-        };
-        cmd.arg("add"); // bun uses 'add'
-        if is_global { cmd.arg("-g"); }
-        cmd.arg(&package_name);
-        cmd
-      } else if has_pnpm {
-         let mut cmd = if cfg!(target_os = "windows") {
-          let mut c = Command::new("cmd");
-          c.args(["/c", "pnpm"]);
-          c
-        } else {
-          Command::new("pnpm")
-        };
-        cmd.arg("add");
-        if is_global { cmd.arg("-g"); }
-        cmd.arg(&package_name);
-        cmd
-      } else {
-        let mut cmd = if cfg!(target_os = "windows") {
-          let mut c = Command::new("cmd");
-          c.args(["/c", "npm"]);
-          c
-        } else {
-          Command::new("npm")
-        };
-        cmd.arg("install");
-        if is_global { cmd.arg("-g"); }
-        cmd.arg(&package_name);
-        cmd
-      };
+      let mut c = Command::new(if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" });
+      c.arg("install");
+      if is_global { c.arg("-g"); } else { c.arg("--save"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "pnpm" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "pnpm.cmd" } else { "pnpm" });
+      c.arg("add");
+      if is_global { c.arg("-g"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "yarn" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "yarn.cmd" } else { "yarn" });
+      c.arg("add");
+      if is_global { c.arg("global"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "bun" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "bun.exe" } else { "bun" });
+      c.arg("add");
+      if is_global { c.arg("-g"); }
+      c.arg(&sanitized_name);
       c
     }
     "pip" => {
-      // Check for uv
-      let has_uv = Command::new("uv").arg("--version").output().is_ok();
-
-      if has_uv {
-         let mut cmd = if cfg!(target_os = "windows") {
-          let mut c = Command::new("cmd");
-          c.args(["/c", "uv"]);
-          c
-        } else {
-          Command::new("uv")
-        };
-        cmd.args(["pip", "install", &package_name]);
-        // uv manages venv automatically or respects active one
-        cmd
-      } else {
-        // For pip, detect venv and use appropriate python executable
-        let python_cmd = if !is_global && project_path.is_some() {
-          let proj_path = Path::new(project_path.as_ref().unwrap());
-          if let Some(venv_path) = detect_venv(proj_path) {
-            // Use venv python
-            if cfg!(target_os = "windows") {
-              venv_path.join("Scripts").join("python.exe")
-            } else {
-              venv_path.join("bin").join("python")
-            }
+      let python_cmd = if !is_global && project_path.is_some() {
+        let proj_path = Path::new(project_path.as_ref().unwrap());
+        if let Some(venv_path) = detect_venv(proj_path) {
+          if cfg!(target_os = "windows") {
+            venv_path.join("Scripts").join("python.exe")
           } else {
-            // No venv found, use system python
-            PathBuf::from("python")
+            venv_path.join("bin").join("python")
           }
         } else {
-          PathBuf::from("python")
-        };
-        
-        let mut c = Command::new(python_cmd);
-        c.args(["-m", "pip", "install", &package_name]);
-        c
-      }
+          PathBuf::from(if cfg!(target_os = "windows") { "python.exe" } else { "python" })
+        }
+      } else {
+        PathBuf::from(if cfg!(target_os = "windows") { "python.exe" } else { "python" })
+      };
+      
+      let mut c = Command::new(python_cmd);
+      c.args(["-m", "pip", "install", &sanitized_name]);
+      c
     }
     "pub" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "flutter"]);
-        cmd
-      } else {
-        Command::new("flutter")
-      };
-      c.args(["pub", "add", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "flutter.bat" } else { "flutter" });
+      c.args(["pub", "add", &sanitized_name]);
       c
     }
     "go" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "go"]);
-        cmd
-      } else {
-        Command::new("go")
-      };
-      c.args(["get", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "go.exe" } else { "go" });
+      c.args(["get", &sanitized_name]);
       c
     }
     "cargo" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "cargo"]);
-        cmd
-      } else {
-        Command::new("cargo")
-      };
-      c.args(["add", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "cargo.exe" } else { "cargo" });
+      c.args(["add", &sanitized_name]);
       c
     }
     _ => return Err("Unsupported package manager".to_string()),
@@ -1883,16 +1870,120 @@ fn install_package(
     });
   }
 
-  // wait for exit
+  // Wait for exit
   let ah = app_handle.clone();
+  let pkg_name = sanitized_name.clone();
   std::thread::spawn(move || {
     if let Ok(exit) = child.wait() {
       let code = exit.code();
-      let _ = ah.emit("install-log", serde_json::json!({ "stream": "exit", "code": code }));
+      println!("[install_package] Finished with exit code: {:?}", code);
+      let _ = ah.emit("install-log", serde_json::json!({ "stream": "exit", "code": code, "package": pkg_name }));
     }
   });
 
   Ok("Installation started".to_string())
+}
+
+// Remove package command
+#[tauri::command]
+fn remove_package(
+  _app: tauri::AppHandle,
+  package_manager: String,
+  package_name: String,
+  project_path: Option<String>,
+  is_global: bool,
+) -> Result<String, String> {
+  use std::process::Command;
+  
+  let sanitized_name = package_name.trim().to_string();
+  
+  eprintln!("[remove_package] Manager: {}, Package: '{}', Path: {:?}", 
+    package_manager, sanitized_name, project_path);
+
+  let mut cmd = match package_manager.as_str() {
+    "npm" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" });
+      c.arg("uninstall");
+      if is_global { c.arg("-g"); } else { c.arg("--save"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "pnpm" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "pnpm.cmd" } else { "pnpm" });
+      c.arg("remove");
+      if is_global { c.arg("-g"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "yarn" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "yarn.cmd" } else { "yarn" });
+      c.arg("remove");
+      if is_global { c.arg("global"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "bun" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "bun.exe" } else { "bun" });
+      c.arg("remove");
+      if is_global { c.arg("-g"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "pip" => {
+      let python_cmd = if !is_global && project_path.is_some() {
+        let proj_path = Path::new(project_path.as_ref().unwrap());
+        if let Some(venv_path) = detect_venv(proj_path) {
+          if cfg!(target_os = "windows") {
+            venv_path.join("Scripts").join("python.exe")
+          } else {
+            venv_path.join("bin").join("python")
+          }
+        } else {
+          PathBuf::from(if cfg!(target_os = "windows") { "python.exe" } else { "python" })
+        }
+      } else {
+        PathBuf::from(if cfg!(target_os = "windows") { "python.exe" } else { "python" })
+      };
+      
+      let mut c = Command::new(python_cmd);
+      c.args(["-m", "pip", "uninstall", "-y", &sanitized_name]);
+      c
+    }
+    "pub" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "flutter.bat" } else { "flutter" });
+      c.args(["pub", "remove", &sanitized_name]);
+      c
+    }
+    "go" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "go.exe" } else { "go" });
+      c.args(["get", &format!("{}@none", sanitized_name)]);
+      c
+    }
+    "cargo" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "cargo.exe" } else { "cargo" });
+      c.args(["remove", &sanitized_name]);
+      c
+    }
+    _ => return Err("Unsupported package manager".to_string()),
+  };
+
+  if let Some(path) = project_path {
+    cmd.current_dir(path);
+  }
+
+  // Spawn and wait
+  let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn process: {}", e))?;
+  
+  if let Ok(exit) = child.wait() {
+    let code = exit.code().unwrap_or(1);
+    if code != 0 {
+      return Err(format!("Command failed with exit code {}", code));
+    }
+  } else {
+    return Err("Failed to wait on child process".into());
+  }
+
+  Ok("Package removed successfully".to_string())
 }
 
 // Update package command
@@ -1906,71 +1997,67 @@ fn update_package(
 ) -> Result<String, String> {
   use std::process::Command;
   
+  let sanitized_name = package_name.trim().to_string();
+  
+  eprintln!("[update_package] Manager: {}, Package: '{}', Path: {:?}", 
+    package_manager, sanitized_name, project_path);
+
   let mut cmd = match package_manager.as_str() {
     "npm" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "npm"]);
-        cmd
+      // Determine the final install target
+      let install_target = if sanitized_name.contains('@') && sanitized_name.matches('@').count() >= 2 {
+        sanitized_name.clone()
+      } else if sanitized_name.contains('@') && !sanitized_name.starts_with('@') {
+        sanitized_name.clone()
       } else {
-        Command::new("npm")
+        format!("{}@latest", sanitized_name)
       };
-      // Use 'npm install package@latest' to actually update to latest version
-      // 'npm update' only updates within semver range in package.json
+
+      let mut c = Command::new(if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" });
       c.arg("install");
-      if is_global {
-        c.arg("-g");
-      }
-      // Check if package_name already contains a version (e.g., "package@1.2.3")
-      // If it does, use it as-is; otherwise append @latest
-      if package_name.contains('@') && package_name.matches('@').count() >= 2 {
-        // Scoped package with version: @scope/package@version
-        c.arg(&package_name);
-      } else if package_name.contains('@') && !package_name.starts_with('@') {
-        // Regular package with version: package@version
-        c.arg(&package_name);
-      } else {
-        // No version specified, add @latest
-        c.arg(format!("{}@latest", package_name));
-      }
+      if is_global { c.arg("-g"); }
+      c.arg(&install_target);
+      c
+    }
+    "pnpm" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "pnpm.cmd" } else { "pnpm" });
+      c.arg("add");
+      if is_global { c.arg("-g"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "yarn" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "yarn.cmd" } else { "yarn" });
+      c.arg("add");
+      if is_global { c.arg("global"); }
+      c.arg(&sanitized_name);
+      c
+    }
+    "bun" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "bun.exe" } else { "bun" });
+      c.arg("add");
+      if is_global { c.arg("-g"); }
+      c.arg(&sanitized_name);
       c
     }
     "pip" => {
-      let mut c = Command::new("python");
-      c.args(["-m", "pip", "install", "--upgrade", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "python.exe" } else { "python" });
+      c.args(["-m", "pip", "install", "--upgrade", &sanitized_name]);
       c
     }
     "pub" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "flutter"]);
-        cmd
-      } else {
-        Command::new("flutter")
-      };
-      c.args(["pub", "upgrade", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "flutter.bat" } else { "flutter" });
+      c.args(["pub", "upgrade", &sanitized_name]);
       c
     }
     "go" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "go"]);
-        cmd
-      } else {
-        Command::new("go")
-      };
-      c.args(["get", "-u", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "go.exe" } else { "go" });
+      c.args(["get", "-u", &sanitized_name]);
       c
     }
     "cargo" => {
-      let mut c = if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", "cargo"]);
-        cmd
-      } else {
-        Command::new("cargo")
-      };
-      c.args(["update", "-p", &package_name]);
+      let mut c = Command::new(if cfg!(target_os = "windows") { "cargo.exe" } else { "cargo" });
+      c.args(["update", "-p", &sanitized_name]);
       c
     }
     _ => return Err("Unsupported package manager".to_string()),
@@ -2160,10 +2247,22 @@ fn open_in_editor(path: String, editor: String) -> Result<(), String> {
 #[tauri::command]
 fn search_packages(package_manager: String, query: String) -> Result<Vec<serde_json::Value>, String> {
   match package_manager.as_str() {
-    "npm" => search_npm_packages(&query),
-    "pip" => search_pypi_packages(&query),
+    "npm" | "pnpm" | "yarn" | "bun" => search_npm_packages(&query),
+    "pip" | "uv" => search_pypi_packages(&query),
     "pub" => search_pub_packages(&query),
-    _ => Err("Search not supported for this package manager".to_string()),
+    "cargo" => search_cargo_packages(&query),
+    "go" => {
+      // Go doesn't have a simple JSON API for search, so we return a dummy result 
+      // allowing the user to install the exact package they typed.
+      let result = serde_json::json!({
+        "name": query,
+        "version": "latest",
+        "description": "Go module (exact match)",
+        "author": "",
+      });
+      Ok(vec![result])
+    },
+    _ => Err(format!("Search not supported for package manager: {}", package_manager)),
   }
 }
 
@@ -2278,6 +2377,42 @@ fn search_pub_packages(query: &str) -> Result<Vec<serde_json::Value>, String> {
         "name": pkg["package"].as_str()?,
         "version": pkg["latest"]["version"].as_str().unwrap_or("latest"),
         "description": pkg["latest"]["pubspec"]["description"].as_str().unwrap_or(""),
+      }))
+    })
+    .collect();
+  
+  Ok(results)
+}
+
+// Search crates.io using API
+fn search_cargo_packages(query: &str) -> Result<Vec<serde_json::Value>, String> {
+  let url = format!("https://crates.io/api/v1/crates?q={}&per_page=20", query);
+  
+  let client = reqwest::blocking::Client::builder()
+    .user_agent("deped-desktop-app (https://github.com/your-repo/deped)")
+    .build()
+    .map_err(|e| format!("Failed to build reqwest client: {}", e))?;
+
+  let response = client.get(&url).send()
+    .map_err(|e| format!("crates.io API request failed: {}", e))?;
+  
+  if !response.status().is_success() {
+    return Err(format!("crates.io API returned status: {}", response.status()));
+  }
+  
+  let data: serde_json::Value = response.json()
+    .map_err(|e| format!("Failed to parse crates.io response: {}", e))?;
+  
+  let crates = data["crates"].as_array()
+    .ok_or("Invalid crates.io API response format")?;
+  
+  let results: Vec<serde_json::Value> = crates.iter()
+    .filter_map(|pkg| {
+      Some(serde_json::json!({
+        "name": pkg["name"].as_str()?,
+        "version": pkg["max_version"].as_str().unwrap_or("latest"),
+        "description": pkg["description"].as_str().unwrap_or(""),
+        "author": "",
       }))
     })
     .collect();
@@ -2692,7 +2827,9 @@ pub fn run() {
       delete_project_folder,
       install_package,
       update_package,
+      remove_package,
       search_packages,
+      detect_package_manager,
       check_venv,
       get_venv,
       create_venv,

@@ -59,71 +59,85 @@ export const useProject = (currentProject, showToast) => {
     return mockInvoke
   }, [])
 
+  const getListen = useCallback(async () => {
+    if (isTauri()) {
+      const { listen } = await import('@tauri-apps/api/event')
+      return listen
+    }
+    return (event, cb) => {
+      // Simple mock for browser testing if needed
+      return () => {}
+    }
+  }, [])
+
+  const [isSilentScanning, setIsSilentScanning] = useState(false)
+
   const scan = useCallback(async (proj, options = {}) => {
     if (!proj) return
     const { silent = false } = options
     const invoke = await getInvoke()
     setBusy(true)
-    if (!silent) setIsScanning(true)
+    if (!silent) {
+      setIsScanning(true)
+      setIsSilentScanning(false)
+    } else {
+      setIsSilentScanning(true)
+    }
 
     try {
-      // Use streaming scan
+      // 1. FAST SCAN: Basic structure & Technologies (Essential for UI)
       await invoke('scan_project_stream', { folder: proj.path })
-
-      // Detect technologies
+      
       const techs = await invoke('detect_project_technologies', { projectPath: proj.path })
       const techsArray = Array.isArray(techs) ? techs : []
-      const mappedTechs = techsArray.map(t => typeof t === 'string' ? getTechIcon(t) : t).filter(Boolean)
-      setProjectTechnologies(mappedTechs)
+      setProjectTechnologies(techsArray.map(t => typeof t === 'string' ? getTechIcon(t) : t).filter(Boolean))
 
-      // Fetch scripts
-      try {
-        console.log(`[useProject] Fetching scripts for: ${proj.path}`)
-        const scripts = await invoke('read_package_scripts', { projectPath: proj.path })
-        console.log(`[useProject] Received scripts:`, scripts)
-        setProjectScripts(scripts || {})
-      } catch (err) {
-        console.error('[useProject] Failed to fetch scripts:', err)
-        setProjectScripts({})
-      }
+      // Overlay will now stay until deep scan is finished for non-silent scans
+      // (Early exit removed for dramatic sequencing)
 
-      // Outdated check
-      const outdated = await invoke('run_npm_outdated', { projectPath: proj.path })
-      if (outdated && typeof outdated === 'object') {
-        const updates = new Map()
-        for (const [name, info] of Object.entries(outdated)) {
-          if (info.latest && info.current && info.latest !== info.current) {
-            updates.set(name, info.latest)
-          }
-        }
-        setAvailableUpdates(updates)
-        setOutdatedCount(updates.size)
-      }
-
-      // Check for python venv
-      try {
-        const v = await invoke('get_venv', { projectPath: proj.path })
-        setVenvPath(v || null)
-      } catch (e) {
-        setVenvPath(null)
-      }
-
-      // Run Audit
+      // 2. BACKGROUND DEEP SCAN: Slow operations (Outdated, Audit, Scripts, Venv)
+      // These run in parallel and don't block each other or the UI
       setIsLoadingAudit(true)
-      try {
-        const audit = await invoke('run_npm_audit', { projectPath: proj.path })
-        setAuditResult(audit)
-      } catch (e) {
-        console.error('[useProject] Audit failed:', e)
-        setAuditResult(null)
-      } finally {
-        setIsLoadingAudit(false)
-      }
+      
+      Promise.allSettled([
+        // Scripts
+        invoke('read_package_scripts', { projectPath: proj.path }).then(s => setProjectScripts(s || {})),
+        
+        // Outdated
+        invoke('run_npm_outdated', { projectPath: proj.path }).then(outdated => {
+          if (outdated && typeof outdated === 'object') {
+            const updates = new Map()
+            for (const [name, info] of Object.entries(outdated)) {
+              if (info.latest && info.current && info.latest !== info.current) {
+                updates.set(name, info.latest)
+              }
+            }
+            setAvailableUpdates(updates)
+            setOutdatedCount(updates.size)
+          }
+        }),
+
+        // Venv
+        invoke('get_venv', { projectPath: proj.path }).then(v => setVenvPath(v || null)),
+
+        // Audit
+        invoke('run_npm_audit', { projectPath: proj.path }).then(audit => {
+          setAuditResult(audit)
+          setIsLoadingAudit(false)
+        }).catch(() => setIsLoadingAudit(false))
+
+      ]).finally(() => {
+        setBusy(false)
+        setIsScanning(false)
+        setIsSilentScanning(false)
+      })
+
     } catch (e) {
+      console.error('[useProject] Scan failed:', e)
       showToast(`Scan failed: ${e}`, 'error')
-    } finally {
       setBusy(false)
       setIsScanning(false)
+      setIsSilentScanning(false)
     }
   }, [getInvoke, showToast])
 
@@ -133,11 +147,16 @@ export const useProject = (currentProject, showToast) => {
     setBusy(true)
     try {
       const manager = scanResult?.packages?.[0]?.manager || 'npm'
+      console.log(`[useProject] Searching for "${searchQuery}" with manager: ${manager}`)
+      
       const results = await invoke('search_packages', {
         packageManager: manager,
         query: searchQuery
       })
+      
+      console.log(`[useProject] Search results:`, results)
       setSearchResults(results || [])
+      
       if (!results || results.length === 0) {
         showToast('No packages found matching your query.', 'info')
       }
@@ -152,25 +171,145 @@ export const useProject = (currentProject, showToast) => {
     if (!currentProject) return
     const invoke = await getInvoke()
     setBusy(true)
+    
+    // ATOMIC NAME LOCK: Force the name to be treated as a single identifier
+    let rawName = packageName.trim()
+    
+    // 1. Remove any accidental spaces
+    rawName = rawName.replace(/\s+/g, '')
+
+    // 2. GUARD: Reject names that look like GitHub shorthands (user/repo) 
+    //    which npm would split into multiple packages. Only @scope/name is valid.
+    if (rawName.includes('/') && !rawName.startsWith('@')) {
+      showToast(`Invalid package name: "${rawName}". Use @scope/name format for scoped packages.`, 'error')
+      setBusy(false)
+      return
+    }
+
+    // 3. Handle versioning if included in the packageName string (e.g. lodash@4.17.21)
+    let finalVersion = version
+    let baseName = rawName
+    
+    // For scoped packages like @scope/pkg@1.2.3, find the LAST @ that's after the /
+    if (rawName.startsWith('@') && rawName.includes('/')) {
+      const slashIndex = rawName.indexOf('/')
+      const afterSlash = rawName.substring(slashIndex)
+      if (afterSlash.includes('@')) {
+        const versionAtIndex = slashIndex + afterSlash.indexOf('@')
+        baseName = rawName.substring(0, versionAtIndex)
+        finalVersion = rawName.substring(versionAtIndex + 1) || version
+      }
+    } else if (rawName.includes('@') && !rawName.startsWith('@')) {
+      // Simple package with version: lodash@4.17.21
+      const atIndex = rawName.indexOf('@')
+      baseName = rawName.substring(0, atIndex)
+      finalVersion = rawName.substring(atIndex + 1) || version
+    }
+
+    console.log(`[useProject] INSTALL REQUEST: raw="${packageName}" → baseName="${baseName}" version="${finalVersion}"`)
+
+    // Set installing state using the base name for UI matching
+    setInstallingPackages(prev => new Map(prev).set(baseName, { progress: 5, type: 'install', lastLog: 'Initializing...' }))
+    
     try {
-      const manager = scanResult?.packages?.[0]?.manager || 'npm'
+      // Determine manager from project metadata if possible
+      const manager = await invoke('detect_package_manager', { projectPath: currentProject.path })
+      console.log(`[useProject] Installation will use manager: ${manager}`)
+
+      // STABLE PROGRESS ORCHESTRATION
+      let currentProgress = 5
+      const progressInterval = setInterval(() => {
+        setInstallingPackages(prev => {
+          const state = prev.get(baseName)
+          if (!state) {
+            clearInterval(progressInterval)
+            return prev
+          }
+          const increment = currentProgress > 80 ? 2 : 8
+          currentProgress = Math.min(95, currentProgress + increment)
+          return new Map(prev).set(baseName, { ...state, progress: currentProgress })
+        })
+      }, 250)
+
+      // ATOMIC NAME LOCK: Use the baseName exactly as provided (no auto-scoping)
+      // If user wants a scoped package, they should include the @ in search or input.
+      let finalInstallName = baseName
+      if (finalVersion !== 'latest' && !baseName.includes('@', 1)) {
+        finalInstallName = `${baseName}@${finalVersion}`
+      }
+
+      console.log(`[useProject] EXEC INSTALL: "${finalInstallName}" (Manager: ${manager})`)
+
+      
       await invoke('install_package', {
         packageManager: manager,
-        packageName: version === 'latest' ? packageName : `${packageName}@${version}`,
+        packageName: finalInstallName,
         projectPath: currentProject.path,
         isGlobal: false
       })
-      showToast(`Started installing ${packageName}`, 'success')
-      // Rescan after a delay
-      setTimeout(() => scan(currentProject), 2000)
+
+      // WAIT FOR ACTUAL COMPLETION VIA LOG EVENT
+      const listen = await getListen()
+      await new Promise((resolve, reject) => {
+        let unlisten
+        const timeout = setTimeout(() => {
+          if (unlisten) unlisten()
+          reject(new Error('Installation timed out after 10 minutes. It may still be running in the background.'))
+        }, 600000) // Increased to 10 minutes for slow Windows environments
+        listen('install-log', (event) => {
+          // Stream logs to console for debugging
+          if (event.payload.line) {
+            const line = event.payload.line.trim()
+            if (line) {
+              console.log(`[install:${manager}] ${line}`)
+              setInstallingPackages(prev => {
+                const state = prev.get(baseName)
+                if (state) {
+                  return new Map(prev).set(baseName, { ...state, lastLog: line.substring(0, 60) })
+                }
+                return prev
+              })
+            }
+          }
+
+          if (event.payload.stream === 'exit' && (event.payload.package === baseName || event.payload.package === finalInstallName)) {
+            clearTimeout(timeout)
+            if (unlisten) unlisten()
+            if (event.payload.code === 0) resolve()
+            else reject(new Error(`Process exited with code ${event.payload.code}`))
+          }
+        }).then(u => unlisten = u)
+      })
+
+      clearInterval(progressInterval)
+      setInstallingPackages(prev => new Map(prev).set(baseName, { progress: 100, type: 'install' }))
+      
+      showToast(`${finalInstallName} installed successfully`, 'success')
+
+      setTimeout(() => {
+        setInstallingPackages(prev => {
+          const next = new Map(prev)
+          next.delete(baseName)
+          return next
+        })
+        // Silent scan will now run after we're sure the install is done
+        scan(currentProject, { silent: true })
+        // Clear search state only after successful installation and scan
+        setSearchResults([])
+        setSearchQuery('')
+      }, 800)
     } catch (e) {
       showToast(`Install failed: ${e}`, 'error')
+      setInstallingPackages(prev => {
+        const next = new Map(prev)
+        next.delete(baseName)
+        return next
+      })
     } finally {
       setBusy(false)
-      setSearchResults([])
-      setSearchQuery('')
     }
   }, [currentProject, scanResult, getInvoke, scan, showToast])
+
 
   const handleUpdate = useCallback(async (packageName) => {
     if (!currentProject) return
@@ -192,18 +331,18 @@ export const useProject = (currentProject, showToast) => {
     }
 
     setBusy(true)
-    setInstallingPackages(prev => new Map(prev).set(packageName, 0))
+    setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 0, type: 'update' }))
     
     try {
       // Simulate progress
       const progressInterval = setInterval(() => {
         setInstallingPackages(prev => {
-          const curr = prev.get(packageName) || 0
-          if (curr >= 90) {
+          const state = prev.get(packageName)
+          if (!state || state.progress >= 90) {
             clearInterval(progressInterval)
             return prev
           }
-          return new Map(prev).set(packageName, curr + 10)
+          return new Map(prev).set(packageName, { ...state, progress: state.progress + 10 })
         })
       }, 200)
 
@@ -216,8 +355,27 @@ export const useProject = (currentProject, showToast) => {
       })
       
       clearInterval(progressInterval)
-      setInstallingPackages(prev => new Map(prev).set(packageName, 100))
+      setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 100, type: 'update' }))
       
+      // Optimistic UI Update: Update version and clear outdated status immediately
+      setScanResult(prev => {
+        const nextPackages = prev.packages.map(p => {
+          if (p.name === packageName) {
+            const latest = availableUpdates.get(packageName)
+            return { ...p, version: latest || p.version, is_outdated: false }
+          }
+          return p
+        })
+        return { ...prev, packages: nextPackages }
+      })
+
+      setAvailableUpdates(prev => {
+        const next = new Map(prev)
+        next.delete(packageName)
+        return next
+      })
+      setOutdatedCount(prev => Math.max(0, prev - 1))
+
       showToast(`Successfully updated ${packageName}`, 'success')
       setTimeout(() => {
         setInstallingPackages(prev => {
@@ -226,7 +384,7 @@ export const useProject = (currentProject, showToast) => {
           return next
         })
         scan(currentProject, { silent: true })
-      }, 1000)
+      }, 200)
     } catch (e) {
       showToast(`Update failed: ${e}`, 'error')
       setInstallingPackages(prev => {
@@ -237,7 +395,7 @@ export const useProject = (currentProject, showToast) => {
     } finally {
       setBusy(false)
     }
-  }, [currentProject, scanResult, getInvoke, scan, showToast])
+  }, [currentProject, scanResult, getInvoke, scan, showToast, availableUpdates])
 
   const handleRevert = useCallback(async (packageName, version) => {
     if (!currentProject) return
@@ -252,9 +410,21 @@ export const useProject = (currentProject, showToast) => {
     }
 
     setBusy(true)
-    setInstallingPackages(prev => new Map(prev).set(packageName, 0))
+    setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 0, type: 'revert' }))
     
     try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setInstallingPackages(prev => {
+          const state = prev.get(packageName)
+          if (!state || state.progress >= 90) {
+            clearInterval(progressInterval)
+            return prev
+          }
+          return new Map(prev).set(packageName, { ...state, progress: state.progress + 10 })
+        })
+      }, 200)
+
       const manager = scanResult?.packages?.find(p => p.name === packageName)?.manager || 'npm'
       await invoke('update_package', {
         packageManager: manager,
@@ -263,7 +433,8 @@ export const useProject = (currentProject, showToast) => {
         isGlobal: false
       })
       
-      setInstallingPackages(prev => new Map(prev).set(packageName, 100))
+      clearInterval(progressInterval)
+      setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 100, type: 'revert' }))
       showToast(`Reverted ${packageName} to v${targetVersion}`, 'success')
       
       // Update history: remove version we just reverted to and any versions after it
@@ -307,15 +478,31 @@ export const useProject = (currentProject, showToast) => {
     const invoke = await getInvoke()
     setBusy(true)
     try {
-      const manager = scanResult?.packages?.find(p => p.name === packageName)?.manager || 'npm'
-      await invoke('uninstall_package', {
-        packageManager: manager,
-        packageName: packageName,
-        projectPath: currentProject.path,
-        isGlobal: false
-      })
+      const pkg = scanResult?.packages?.find(p => p.name === packageName)
+      if (!pkg?.path) throw new Error('Package path not found')
+
+      // Optimistic UI: Remove from state immediately
+      setScanResult(prev => ({
+        ...prev,
+        packages: prev.packages.filter(p => p.name !== packageName),
+        total_count: Math.max(0, (prev.total_count || 0) - 1),
+        total_size: Math.max(0, (prev.total_size || 0) - (pkg.size || 0))
+      }))
+
+      if (pkg.is_declared) {
+        await invoke('remove_package', {
+          packageManager: pkg.manager || 'npm',
+          packageName: pkg.name,
+          projectPath: currentProject.path,
+          isGlobal: false
+        })
+      } else {
+        await invoke('delete_package', {
+          path: pkg.path
+        })
+      }
       showToast(`${packageName} uninstalled`, 'success')
-      setTimeout(() => scan(currentProject), 1000)
+      setTimeout(() => scan(currentProject, { silent: true }), 1000)
     } catch (e) {
       showToast(`Uninstall failed: ${e}`, 'error')
     } finally {
@@ -348,27 +535,39 @@ export const useProject = (currentProject, showToast) => {
 
     if (isTauri()) {
       import('@tauri-apps/api/event').then(({ listen }) => {
+        let pendingPackages = []
+        let updateTimer = null
+
         listen('scan-progress', (event) => {
           const pkg = event.payload?.package
           if (!pkg) return
           
-          setScanResult(prev => {
-            const packages = prev?.packages || []
-            const idx = packages.findIndex(p => p && p.path === pkg.path)
-            let newPackages
-            if (idx >= 0) {
-              newPackages = [...packages]
-              newPackages[idx] = pkg
-            } else {
-              newPackages = [...packages, pkg]
-            }
-            return {
-              ...prev,
-              packages: newPackages,
-              total_size: newPackages.reduce((s, p) => s + (p?.size || 0), 0),
-              total_count: newPackages.length
-            }
-          })
+          pendingPackages.push(pkg)
+
+          if (!updateTimer) {
+            updateTimer = setTimeout(() => {
+              setScanResult(prev => {
+                const packages = prev?.packages || []
+                const nextPackages = [...packages]
+                
+                pendingPackages.forEach(p => {
+                  const idx = nextPackages.findIndex(old => old.path === p.path)
+                  if (idx >= 0) nextPackages[idx] = p
+                  else nextPackages.push(p)
+                })
+                
+                pendingPackages = []
+                updateTimer = null
+
+                return {
+                  ...prev,
+                  packages: nextPackages,
+                  total_size: nextPackages.reduce((s, p) => s + (p?.size || 0), 0),
+                  total_count: nextPackages.length
+                }
+              })
+            }, 150) // Batch updates every 150ms
+          }
         }).then(u => unlistens.push(u))
 
         listen('scan-complete', handleScanComplete).then(u => unlistens.push(u))
@@ -407,33 +606,148 @@ export const useProject = (currentProject, showToast) => {
   }, [currentProject, scan])
 
   const handleUpdateSelected = useCallback(async (packages) => {
-    if (!currentProject) return
+    if (!currentProject || !packages || packages.length === 0) return
     const invoke = await getInvoke()
     setBusy(true)
     let successCount = 0
+    
     for (const pkg of packages) {
       try {
+        // Store history before update
+        if (pkg.version) {
+          setPackageVersionHistory(prev => {
+            const next = new Map(prev)
+            const history = next.get(pkg.name) || []
+            if (!history.includes(pkg.version)) {
+              const updated = [...history, pkg.version]
+              next.set(pkg.name, updated)
+              saveVersionHistory(next)
+            }
+            return next
+          })
+        }
+
+        // Set progress state
+        setInstallingPackages(prev => new Map(prev).set(pkg.name, { progress: 30, type: 'update' }))
+
         await invoke('update_package', {
           packageManager: pkg.manager,
           packageName: pkg.name,
           projectPath: currentProject.path,
           isGlobal: false
         })
+        
         successCount++
+        setInstallingPackages(prev => new Map(prev).set(pkg.name, { progress: 100, type: 'update' }))
+        
+        // Optimistic update for each package
+        setScanResult(prev => {
+          const nextPackages = prev.packages.map(p => {
+            if (p.name === pkg.name) {
+              const latest = availableUpdates.get(pkg.name)
+              return { ...p, version: latest || p.version, is_outdated: false }
+            }
+            return p
+          })
+          return { ...prev, packages: nextPackages }
+        })
       } catch (e) {
         console.error('Update failed for', pkg.name, e)
+        setInstallingPackages(prev => {
+          const next = new Map(prev)
+          next.delete(pkg.name)
+          return next
+        })
       }
     }
+
     showToast(`Updated ${successCount}/${packages.length} packages`, successCount === packages.length ? 'success' : 'info')
-    setBusy(false)
-    scan(currentProject)
-  }, [currentProject, getInvoke, scan, showToast])
+    
+    // Cleanup progress bars
+    setTimeout(() => {
+      setInstallingPackages(prev => {
+        const next = new Map(prev)
+        packages.forEach(p => next.delete(p.name))
+        return next
+      })
+      setSelectedPackages(new Set())
+      setBusy(false)
+      scan(currentProject, { silent: true })
+    }, 500)
+  }, [currentProject, getInvoke, scan, showToast, availableUpdates])
 
   const handleUpdateAll = useCallback(async () => {
     const toUpdate = scanResult?.packages?.filter(p => p.manager === 'npm' && p.is_outdated) || []
-    if (toUpdate.length === 0) return
+    if (toUpdate.length === 0) {
+      // Fallback: check availableUpdates map
+      const availableNames = Array.from(availableUpdates.keys())
+      const packagesToUpdate = scanResult?.packages?.filter(p => availableNames.includes(p.name)) || []
+      if (packagesToUpdate.length > 0) {
+        await handleUpdateSelected(packagesToUpdate)
+      } else {
+        showToast('No updates available', 'info')
+      }
+      return
+    }
     await handleUpdateSelected(toUpdate)
-  }, [scanResult, handleUpdateSelected])
+  }, [scanResult, availableUpdates, handleUpdateSelected, showToast])
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedPackages.size === 0 || !currentProject) return
+
+    const invoke = await getInvoke()
+    setBusy(true)
+    let successCount = 0
+    const packagesToDelete = Array.from(selectedPackages).map(path => 
+      scanResult?.packages?.find(p => p.path === path)
+    ).filter(Boolean)
+
+    // Optimistic UI: Remove all selected packages from state immediately
+    const deletedSize = packagesToDelete.reduce((sum, p) => sum + (p.size || 0), 0)
+    setScanResult(prev => ({
+      ...prev,
+      packages: prev.packages.filter(p => !selectedPackages.has(p.path)),
+      total_count: Math.max(0, (prev.total_count || 0) - packagesToDelete.length),
+      total_size: Math.max(0, (prev.total_size || 0) - deletedSize)
+    }))
+
+    for (const pkg of packagesToDelete) {
+      try {
+        setInstallingPackages(prev => new Map(prev).set(pkg.name, { progress: 50, type: 'delete' }))
+        
+        if (pkg.is_declared) {
+          await invoke('remove_package', {
+            packageManager: pkg.manager || 'npm',
+            packageName: pkg.name,
+            projectPath: currentProject.path,
+            isGlobal: false
+          })
+        } else {
+          await invoke('delete_package', {
+            path: pkg.path
+          })
+        }
+        
+        successCount++
+      } catch (e) {
+        console.error(`Delete failed for ${pkg.name}:`, e)
+        showToast(`Failed to delete ${pkg.name}: ${e}`, 'error')
+      } finally {
+        setInstallingPackages(prev => {
+          const next = new Map(prev)
+          next.delete(pkg.name)
+          return next
+        })
+      }
+    }
+    if (successCount > 0) {
+      showToast(`Successfully uninstalled ${successCount} package(s)`, 'success')
+    }
+    setSelectedPackages(new Set())
+    setBusy(false)
+    scan(currentProject, { silent: true })
+  }, [selectedPackages, scanResult, currentProject, getInvoke, scan, showToast])
+
 
   const togglePackage = useCallback((path) => {
     setSelectedPackages(prev => {
@@ -477,6 +791,7 @@ export const useProject = (currentProject, showToast) => {
     outdatedCount,
     venvPath,
     isScanning,
+    isSilentScanning,
     busy,
     availableUpdates,
     packageVersionHistory,
@@ -504,6 +819,7 @@ export const useProject = (currentProject, showToast) => {
     openFolder,
     handleUpdateSelected,
     handleUpdateAll,
+    handleDeleteSelected,
     togglePackage,
     installingPackagesHasPath,
     runScript
