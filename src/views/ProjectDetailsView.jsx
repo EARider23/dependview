@@ -105,7 +105,8 @@ const ProjectDetailsView = React.memo(({
     togglePackage,
     installingPackagesHasPath,
     installingPackages,
-    runScript
+    runScript,
+    handleAuditFix
   } = useProject(currentProject, showToast)
 
   // Memoize filtered package groups to avoid expensive filtering on every render
@@ -137,7 +138,10 @@ const ProjectDetailsView = React.memo(({
   const searchInputRef = useRef(null)
   const [isUninstallDialogOpen, setIsUninstallDialogOpen] = React.useState(false);
   const [confirmDeleteText, setConfirmDeleteText] = React.useState('');
-  const [autoUpdate, setAutoUpdate] = React.useState(false);
+  const [autoUpdate, setAutoUpdate] = React.useState(() => {
+    const saved = localStorage.getItem('autoUpdate_enabled');
+    return saved === 'true';
+  });
   const [showCore, setShowCore] = React.useState(true);
   const [showSub, setShowSub] = React.useState(false);
 
@@ -184,7 +188,7 @@ const ProjectDetailsView = React.memo(({
 
   // Automatic Silent Refresh: Keep dependency data fresh every 60 seconds
   React.useEffect(() => {
-    if (!currentProject) return;
+    if (!currentProject || !autoUpdate) return;
 
     const interval = setInterval(() => {
       // Only refresh if not already busy to avoid overlapping scans
@@ -195,7 +199,27 @@ const ProjectDetailsView = React.memo(({
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [currentProject, scan, busy]);
+  }, [currentProject, scan, busy, autoUpdate]);
+
+  // Automatic Maintenance Assistant: Handle updates and security fixes
+  React.useEffect(() => {
+    if (!autoUpdate || busy) return;
+
+    // 1. Auto-Update packages
+    if (availableUpdates.size > 0) {
+      console.log('[MaintenanceAssistant] Triggering auto-update for', availableUpdates.size, 'packages');
+      handleUpdateAll({ silent: true });
+      return; // Prioritize updates
+    }
+
+    // 2. Auto-Fix security vulnerabilities
+    const vulns = auditResult?.metadata?.vulnerabilities || {};
+    const totalVulns = (vulns.total || 0) + (vulns.critical || 0) + (vulns.high || 0);
+    if (totalVulns > 0) {
+      console.log('[MaintenanceAssistant] Triggering auto-security fix for', totalVulns, 'vulnerabilities');
+      handleAuditFix();
+    }
+  }, [autoUpdate, availableUpdates, auditResult, busy, handleUpdateAll, handleAuditFix]);
 
 
   const handleUninstall = useCallback(() => {
@@ -1028,7 +1052,19 @@ const ProjectDetailsView = React.memo(({
                   </div>
                   <div>
                     <h3 className="text-[15px] font-black text-slate-900 tracking-tight font-sans">Update Packages</h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] font-sans">Monitor & Update</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] font-sans">Monitor & Update</p>
+                      {autoUpdate && busy && (
+                        <motion.div
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ repeat: Infinity, duration: 2 }}
+                          className="flex items-center gap-1"
+                        >
+                          <div className="w-1.5 h-1.5 bg-rose-500 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                          <span className="text-[8px] font-black text-rose-500 uppercase tracking-tighter">Maintenance Active</span>
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <Badge className="bg-rose-50 text-rose-600 border border-rose-100 font-black font-mono px-2.5 py-1 text-[9px] uppercase tracking-wider rounded-lg shadow-sm hover:bg-rose-600 hover:text-white transition-all cursor-default">
@@ -1041,7 +1077,11 @@ const ProjectDetailsView = React.memo(({
                 <div className="flex flex-col gap-4 w-full">
                   <div className="grid grid-cols-2 gap-3">
                     <div
-                      onClick={() => setAutoUpdate(!autoUpdate)}
+                      onClick={() => {
+                        const nextValue = !autoUpdate;
+                        setAutoUpdate(nextValue);
+                        localStorage.setItem('autoUpdate_enabled', nextValue.toString());
+                      }}
                       className="p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-between hover:bg-white hover:border-rose-200 transition-all shadow-sm cursor-pointer group/toggle"
                     >
                       <div className="flex flex-col">
@@ -1052,7 +1092,9 @@ const ProjectDetailsView = React.memo(({
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
-                          setAutoUpdate(!autoUpdate);
+                          const nextValue = !autoUpdate;
+                          setAutoUpdate(nextValue);
+                          localStorage.setItem('autoUpdate_enabled', nextValue.toString());
                         }}
                         className={`w-10 h-6 rounded-full p-1 transition-all duration-300 relative ${autoUpdate ? 'bg-rose-600' : 'bg-slate-300'}`}
                       >
@@ -1065,7 +1107,7 @@ const ProjectDetailsView = React.memo(({
                       className="h-full min-h-[56px] rounded-2xl bg-white border border-rose-100 text-rose-600 font-black text-[11px] uppercase tracking-[0.15em] hover:bg-rose-600 hover:text-white transition-all flex flex-col gap-0.5 shadow-sm active:scale-95 group/scan"
                       onClick={() => scan(currentProject, { silent: true })}
                     >
-                      <RefreshCw className="w-3.5 h-3.5 group-hover/scan:rotate-180 transition-transform duration-500" />
+                      <RefreshCw className={`w-3.5 h-3.5 group-hover/scan:rotate-180 transition-transform duration-500 ${busy ? 'animate-spin' : ''}`} />
                       <span>Check for Update</span>
                     </Button>
                   </div>
@@ -1193,9 +1235,9 @@ const ProjectDetailsView = React.memo(({
             animate={{ opacity: 1, x: 0 }}
             className="overflow-visible mt-6"
           >
-            <button
+            <div
               onClick={() => setShowCore(!showCore)}
-              className="w-full p-4 flex items-center justify-between bg-white border-2 border-indigo-500 rounded-2xl shadow-sm hover:border-indigo-200 transition-all group/bar"
+              className="w-full p-4 flex items-center justify-between bg-white border-2 border-indigo-500 rounded-2xl shadow-sm hover:border-indigo-200 transition-all group/bar cursor-pointer"
             >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover/bar:bg-indigo-600 group-hover/bar:text-white transition-colors">
@@ -1224,7 +1266,7 @@ const ProjectDetailsView = React.memo(({
                 </Button>
                 {showCore ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
               </div>
-            </button>
+            </div>
 
             <div className={`p-4 pt-3 mt-4 ${!showCore ? 'hidden' : ''} relative`}>
               <AnimatePresence>
@@ -1280,9 +1322,9 @@ const ProjectDetailsView = React.memo(({
             animate={{ opacity: 1, x: 0 }}
             className="overflow-visible mt-6"
           >
-            <button
+            <div
               onClick={() => setShowSub(!showSub)}
-              className="w-full p-4 flex items-center justify-between bg-white border-2 border-slate-500 rounded-2xl shadow-sm hover:border-slate-200 transition-all group/bar"
+              className="w-full p-4 flex items-center justify-between bg-white border-2 border-slate-500 rounded-2xl shadow-sm hover:border-slate-200 transition-all group/bar cursor-pointer"
             >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 group-hover/bar:bg-slate-900 group-hover/bar:text-white transition-colors">
@@ -1311,7 +1353,7 @@ const ProjectDetailsView = React.memo(({
                 </Button>
                 {showSub ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
               </div>
-            </button>
+            </div>
 
             <div className={`p-4 pt-5 pb-4 ${!showSub ? 'hidden' : ''} relative`}>
               <AnimatePresence>

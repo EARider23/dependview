@@ -1611,7 +1611,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                             const fullPath = targetFolder.endsWith('/') || targetFolder.endsWith('\\')
                                                 ? `${targetFolder}${projectName}`
                                                 : `${targetFolder}/${projectName}`;
-                                            
+
                                             if (preferredIde === 'deped') {
                                                 if (onImport) onImport(fullPath);
                                             } else {
@@ -1632,3 +1632,4 @@ export function ProjectCreationStudio({ onBack, onImport }) {
         </div>
     )
 }
+

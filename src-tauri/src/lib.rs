@@ -35,21 +35,16 @@ struct DuplicateGroup {
   total_wasted: u64,
 }
 
-// Calculate directory size recursively
+// Calculate directory size using walkdir for better performance
 fn calculate_dir_size(path: &Path) -> u64 {
-  let mut total = 0u64;
-  if let Ok(entries) = fs::read_dir(path) {
-    for entry in entries.flatten() {
-      if let Ok(metadata) = entry.metadata() {
-        if metadata.is_file() {
-          total += metadata.len();
-        } else if metadata.is_dir() {
-          total += calculate_dir_size(&entry.path());
-        }
-      }
-    }
-  }
-  total
+  walkdir::WalkDir::new(path)
+    .min_depth(0)
+    .into_iter()
+    .filter_map(|e| e.ok())
+    .filter_map(|e| e.metadata().ok())
+    .filter(|m| m.is_file())
+    .map(|m| m.len())
+    .sum()
 }
 
 // Read declared dependencies from package.json
@@ -574,49 +569,40 @@ fn mark_usage_for_packages(base_path: &Path, packages: &mut [InstalledPackage]) 
 // Detect globally installed npm packages
 #[tauri::command]
 fn scan_global_npm() -> Vec<InstalledPackage> {
-  println!("Scanning global npm");
+  println!("Scanning global npm (Fast Direct Scan)");
   use std::process::Command;
   let mut out = Vec::new();
-  if let Ok(root_out) = Command::new("npm").arg("root").arg("-g").output() {
+  
+  let npm_cmd = if cfg!(windows) { "npm.cmd" } else { "npm" };
+  
+  if let Ok(root_out) = Command::new(npm_cmd).arg("root").arg("-g").output() {
     if root_out.status.success() {
-      if let Ok(root) = String::from_utf8(root_out.stdout) {
-        let root = root.trim();
-        if let Ok(list_out) = Command::new("npm").args(["ls", "-g", "--json", "--depth=0"]).output() {
-          if list_out.status.success() {
-            if let Ok(json_str) = String::from_utf8(list_out.stdout) {
-              if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                if let Some(deps) = val.get("dependencies").and_then(|d| d.as_object()) {
-                  for (name, v) in deps.iter() {
-                    let version = v.get("version").and_then(|s| s.as_str()).unwrap_or("unknown").to_string();
-                    let root_path = Path::new(root);
-                    let path = root_path.join(name);
-                    
-                    // On Windows, sometimes root is different or packages are in different subdirs
-                    let mut size = 0;
-                    let mut actual_path = path.clone();
-                    
-                    if actual_path.exists() {
-                        size = calculate_dir_size(&actual_path);
-                    } else {
-                        // Try lowercase
-                        let lower_path = root_path.join(name.to_lowercase());
-                        if lower_path.exists() {
-                            actual_path = lower_path;
-                            size = calculate_dir_size(&actual_path);
-                        }
-                    }
-
-                    out.push(InstalledPackage {
-                      name: name.clone(),
-                      version,
-                      manager: "npm".to_string(),
-                      path: actual_path.to_string_lossy().to_string(),
-                      size,
-                      used: None,
-                      is_global: true,
-                      icon: read_icon_data(&actual_path),
-                      is_declared: false,
-                    });
+      if let Ok(root_str) = String::from_utf8(root_out.stdout) {
+        let root_path = Path::new(root_str.trim());
+        if root_path.exists() {
+          if let Ok(entries) = fs::read_dir(root_path) {
+            for entry in entries.flatten() {
+              let path = entry.path();
+              if path.is_dir() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                
+                // Handle scoped packages
+                if name.starts_with('@') {
+                   if let Ok(sub_entries) = fs::read_dir(&path) {
+                     for sub_entry in sub_entries.flatten() {
+                       let sub_path = sub_entry.path();
+                       if sub_path.is_dir() {
+                         let sub_name = sub_entry.file_name().to_string_lossy().to_string();
+                         let full_name = format!("{}/{}", name, sub_name);
+                         if let Some(pkg) = read_npm_package_info(&sub_path, &full_name) {
+                           out.push(pkg);
+                         }
+                       }
+                     }
+                   }
+                } else {
+                  if let Some(pkg) = read_npm_package_info(&path, &name) {
+                    out.push(pkg);
                   }
                 }
               }
@@ -630,71 +616,318 @@ fn scan_global_npm() -> Vec<InstalledPackage> {
   out
 }
 
+fn read_npm_package_info(path: &Path, name: &str) -> Option<InstalledPackage> {
+  let pkg_json_path = path.join("package.json");
+  if pkg_json_path.exists() {
+    if let Ok(content) = fs::read_to_string(&pkg_json_path) {
+      if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+        let version = json.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0").to_string();
+        return Some(InstalledPackage {
+          name: name.to_string(),
+          version,
+          manager: "npm".to_string(),
+          path: path.to_string_lossy().to_string(),
+          size: calculate_dir_size(path),
+          used: None,
+          is_global: true,
+          icon: read_icon_data(path),
+          is_declared: false,
+        });
+      }
+    }
+  }
+  None
+}
+
+// Detect globally installed yarn packages
+#[tauri::command]
+fn scan_global_yarn() -> Vec<InstalledPackage> {
+    println!("Scanning global yarn");
+    use std::process::Command;
+    let mut out = Vec::new();
+    let yarn_cmd = if cfg!(windows) { "yarn.cmd" } else { "yarn" };
+
+    if let Ok(list_out) = Command::new(yarn_cmd).args(["global", "list", "--json"]).output() {
+        if list_out.status.success() {
+            if let Ok(json_str) = String::from_utf8(list_out.stdout) {
+                // Yarn JSON output is a bit complex, let's try to parse the lines
+                for line in json_str.lines() {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                        if let Some(data) = val.get("data").and_then(|d| d.as_str()) {
+                            if data.contains('@') {
+                                let parts: Vec<&str> = data.split('@').collect();
+                                if parts.len() >= 2 {
+                                    let name = parts[0].to_string();
+                                    let version = parts[1].to_string();
+                                    out.push(InstalledPackage {
+                                        name,
+                                        version,
+                                        manager: "yarn".to_string(),
+                                        path: String::new(),
+                                        size: 0,
+                                        used: None,
+                                        is_global: true,
+                                        icon: None,
+                                        is_declared: false,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("Found {} global yarn packages", out.len());
+    out
+}
+
+// Detect globally installed pnpm packages
+#[tauri::command]
+fn scan_global_pnpm() -> Vec<InstalledPackage> {
+    println!("Scanning global pnpm");
+    use std::process::Command;
+    let mut out = Vec::new();
+    let pnpm_cmd = if cfg!(windows) { "pnpm.cmd" } else { "pnpm" };
+
+    if let Ok(list_out) = Command::new(pnpm_cmd).args(["list", "-g", "--json"]).output() {
+        if list_out.status.success() {
+            if let Ok(json_str) = String::from_utf8(list_out.stdout) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    if let Some(arr) = val.as_array() {
+                        for item in arr {
+                            if let Some(deps) = item.get("dependencies").and_then(|d| d.as_object()) {
+                                for (name, v) in deps.iter() {
+                                    let version = v.get("version").and_then(|s| s.as_str()).unwrap_or("unknown").to_string();
+                                    let path = v.get("path").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                                    
+                                    out.push(InstalledPackage {
+                                        name: name.clone(),
+                                        version,
+                                        manager: "pnpm".to_string(),
+                                        path: path.clone(),
+                                        size: if !path.is_empty() { calculate_dir_size(Path::new(&path)) } else { 0 },
+                                        used: None,
+                                        is_global: true,
+                                        icon: if !path.is_empty() { read_icon_data(Path::new(&path)) } else { None },
+                                        is_declared: false,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("Found {} global pnpm packages", out.len());
+    out
+}
+
 // Detect globally installed pip packages
 #[tauri::command]
 fn scan_global_pip() -> Vec<InstalledPackage> {
   println!("Scanning global pip");
   use std::process::Command;
   let mut out = Vec::new();
-  // get site-packages path
-  if let Ok(sp_out) = Command::new("python").args(["-c", "import site, json; print(json.dumps(site.getsitepackages()))"]).output() {
-    if sp_out.status.success() {
-      if let Ok(json_str) = String::from_utf8(sp_out.stdout) {
-        if let Ok(arr) = serde_json::from_str::<Vec<String>>(&json_str) {
-          if !arr.is_empty() {
-            let site_pkg = PathBuf::from(&arr[0]);
-            if let Ok(list_out) = Command::new("python").args(["-m", "pip", "list", "--format=json"]).output() {
-              if list_out.status.success() {
-                if let Ok(pkgs_str) = String::from_utf8(list_out.stdout) {
-                  if let Ok(pkgs) = serde_json::from_str::<serde_json::Value>(&pkgs_str) {
-                    if let Some(arr) = pkgs.as_array() {
-                      for p in arr {
-                        if let (Some(name), Some(version)) = (p.get("name").and_then(|n| n.as_str()), p.get("version").and_then(|v| v.as_str())) {
-                          // Try multiple name variations to find the directory in site-packages
-                          let variations = vec![
-                            name.to_string(),
-                            name.to_lowercase(),
-                            name.replace('-', "_"),
-                            name.to_lowercase().replace('-', "_"),
-                          ];
-                          
-                          let mut path = site_pkg.join(name);
-                          let mut size = 0;
-                          
-                          for var in variations {
-                            let p = site_pkg.join(&var);
-                            if p.exists() {
-                              path = p;
-                              size = calculate_dir_size(&path);
-                              break;
+  
+  let python_cmds = vec!["python", "python3", "py"];
+  
+  for cmd in python_cmds {
+    // get site-packages path
+    if let Ok(sp_out) = Command::new(cmd).args(["-c", "import site, json; print(json.dumps(site.getsitepackages()))"]).output() {
+        if sp_out.status.success() {
+            if let Ok(json_str) = String::from_utf8(sp_out.stdout) {
+                if let Ok(arr) = serde_json::from_str::<Vec<String>>(&json_str) {
+                    if !arr.is_empty() {
+                        let site_pkg = PathBuf::from(&arr[0]);
+                        if let Ok(list_out) = Command::new(cmd).args(["-m", "pip", "list", "--format=json"]).output() {
+                            if list_out.status.success() {
+                                if let Ok(pkgs_str) = String::from_utf8(list_out.stdout) {
+                                    if let Ok(pkgs) = serde_json::from_str::<serde_json::Value>(&pkgs_str) {
+                                        if let Some(pkg_arr) = pkgs.as_array() {
+                                            for p in pkg_arr {
+                                                if let (Some(name), Some(version)) = (p.get("name").and_then(|n| n.as_str()), p.get("version").and_then(|v| v.as_str())) {
+                                                    let variations = vec![
+                                                        name.to_string(),
+                                                        name.to_lowercase(),
+                                                        name.replace('-', "_"),
+                                                        name.to_lowercase().replace('-', "_"),
+                                                    ];
+                                                    
+                                                    let mut path = site_pkg.join(name);
+                                                    let mut size = 0;
+                                                    
+                                                    for var in variations {
+                                                        let p = site_pkg.join(&var);
+                                                        if p.exists() {
+                                                            path = p;
+                                                            size = calculate_dir_size(&path);
+                                                            break;
+                                                        }
+                                                    }
+                                                    
+                                                    out.push(InstalledPackage {
+                                                        name: name.to_string(),
+                                                        version: version.to_string(),
+                                                        manager: "pip".to_string(),
+                                                        path: path.to_string_lossy().to_string(),
+                                                        size,
+                                                        used: None,
+                                                        is_global: true,
+                                                        icon: read_icon_data(&path),
+                                                        is_declared: false,
+                                                    });
+                                                }
+                                            }
+                                            // If we found packages, we can stop searching other python commands
+                                            if !out.is_empty() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                          }
-                          
-                          out.push(InstalledPackage {
-                            name: name.to_string(),
-                            version: version.to_string(),
-                            manager: "pip".to_string(),
-                                path: path.to_string_lossy().to_string(),
-                                size,
-                                used: None,
-                                is_global: true,
-                                icon: read_icon_data(&path),
-                                is_declared: false,
-                          });
                         }
-                      }
                     }
-                  }
                 }
-              }
             }
-          }
         }
-      }
     }
   }
   println!("Found {} global pip packages", out.len());
   out
+}
+
+// Detect globally installed cargo packages
+#[tauri::command]
+fn scan_global_cargo() -> Vec<InstalledPackage> {
+    println!("Scanning global cargo");
+    use std::process::Command;
+    let mut out = Vec::new();
+    
+    // get cargo home or default
+    let cargo_home = std::env::var("CARGO_HOME").unwrap_or_else(|_| {
+        if cfg!(windows) {
+            format!("{}\\.cargo", std::env::var("USERPROFILE").unwrap_or_default())
+        } else {
+            format!("{}/.cargo", std::env::var("HOME").unwrap_or_default())
+        }
+    });
+    let bin_path = Path::new(&cargo_home).join("bin");
+
+    if let Ok(list_out) = Command::new("cargo").arg("install").arg("--list").output() {
+        if list_out.status.success() {
+            if let Ok(s) = String::from_utf8(list_out.stdout) {
+                // Cargo output is text-based: "package-name v0.1.0:"
+                for line in s.lines() {
+                    if line.contains(" v") && line.ends_with(':') {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 2 {
+                            let name = parts[0].to_string();
+                            let version = parts[1].trim_start_matches('v').trim_end_matches(':').to_string();
+                            let mut path = bin_path.join(&name);
+                            if cfg!(windows) {
+                                path.set_extension("exe");
+                            }
+                            
+                            let size = if path.exists() {
+                                fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
+                            } else { 0 };
+
+                            out.push(InstalledPackage {
+                                name: name.clone(),
+                                version,
+                                manager: "cargo".to_string(),
+                                path: path.to_string_lossy().to_string(),
+                                size,
+                                used: None,
+                                is_global: true,
+                                icon: None,
+                                is_declared: false,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("Found {} global cargo packages", out.len());
+    out
+}
+
+// Detect globally installed composer packages
+#[tauri::command]
+fn scan_global_composer() -> Vec<InstalledPackage> {
+    println!("Scanning global composer");
+    use std::process::Command;
+    let mut out = Vec::new();
+    
+    if let Ok(list_out) = Command::new("composer").args(["global", "show", "--format=json"]).output() {
+        if list_out.status.success() {
+            if let Ok(s) = String::from_utf8(list_out.stdout) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&s) {
+                    if let Some(installed) = val.get("installed").and_then(|i| i.as_array()) {
+                        for p in installed {
+                            if let (Some(name), Some(version)) = (p.get("name").and_then(|n| n.as_str()), p.get("version").and_then(|v| v.as_str())) {
+                                out.push(InstalledPackage {
+                                    name: name.to_string(),
+                                    version: version.to_string(),
+                                    manager: "composer".to_string(),
+                                    path: String::new(), // composer doesn't easily give paths for global packages
+                                    size: 0,
+                                    used: None,
+                                    is_global: true,
+                                    icon: None,
+                                    is_declared: false,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("Found {} global composer packages", out.len());
+    out
+}
+
+// Detect globally installed gem packages
+#[tauri::command]
+fn scan_global_gem() -> Vec<InstalledPackage> {
+    println!("Scanning global gem");
+    use std::process::Command;
+    let mut out = Vec::new();
+    
+    if let Ok(list_out) = Command::new("gem").args(["list", "--local"]).output() {
+        if list_out.status.success() {
+            if let Ok(s) = String::from_utf8(list_out.stdout) {
+                for line in s.lines() {
+                    if line.contains('(') && line.contains(')') {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if !parts.is_empty() {
+                            let name = parts[0].to_string();
+                            let version = parts[1].trim_matches(|c| c == '(' || c == ')').split(',').next().unwrap_or("unknown").to_string();
+                            
+                            out.push(InstalledPackage {
+                                name,
+                                version,
+                                manager: "gem".to_string(),
+                                path: String::new(),
+                                size: 0,
+                                used: None,
+                                is_global: true,
+                                icon: None,
+                                is_declared: false,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("Found {} global gem packages", out.len());
+    out
 }
 
 #[tauri::command]
@@ -811,14 +1044,34 @@ async fn clean_selected_caches(paths: Vec<String>) -> Result<(), String> {
 
 #[tauri::command]
 fn scan_system_packages() -> Result<serde_json::Value, String> {
-  println!("Scanning system packages");
+  println!("Scanning system packages (Parallel Mode)");
   
-  let npm_packages = scan_global_npm();
-  let pip_packages = scan_global_pip();
+  use std::thread;
+  
+  let t_npm = thread::spawn(|| scan_global_npm());
+  let t_yarn = thread::spawn(|| scan_global_yarn());
+  let t_pnpm = thread::spawn(|| scan_global_pnpm());
+  let t_pip = thread::spawn(|| scan_global_pip());
+  let t_cargo = thread::spawn(|| scan_global_cargo());
+  let t_composer = thread::spawn(|| scan_global_composer());
+  let t_gem = thread::spawn(|| scan_global_gem());
+  
+  let npm_packages = t_npm.join().unwrap_or_default();
+  let yarn_packages = t_yarn.join().unwrap_or_default();
+  let pnpm_packages = t_pnpm.join().unwrap_or_default();
+  let pip_packages = t_pip.join().unwrap_or_default();
+  let cargo_packages = t_cargo.join().unwrap_or_default();
+  let composer_packages = t_composer.join().unwrap_or_default();
+  let gem_packages = t_gem.join().unwrap_or_default();
   
   let mut all_packages = Vec::new();
   all_packages.extend(npm_packages);
+  all_packages.extend(yarn_packages);
+  all_packages.extend(pnpm_packages);
   all_packages.extend(pip_packages);
+  all_packages.extend(cargo_packages);
+  all_packages.extend(composer_packages);
+  all_packages.extend(gem_packages);
   
   let total_size: u64 = all_packages.iter().map(|p| p.size).sum();
   let total_count = all_packages.len();
@@ -1961,10 +2214,31 @@ fn remove_package(
     }
     "cargo" => {
       let mut c = Command::new(if cfg!(target_os = "windows") { "cargo.exe" } else { "cargo" });
-      c.args(["remove", &sanitized_name]);
+      if is_global {
+        c.arg("uninstall");
+      } else {
+        c.arg("remove");
+      }
+      c.arg(&sanitized_name);
       c
     }
-    _ => return Err("Unsupported package manager".to_string()),
+    "composer" => {
+      let cmd = if cfg!(target_os = "windows") { "composer" } else { "composer" };
+      let mut c = Command::new(cmd);
+      if is_global {
+        c.args(["global", "remove", &sanitized_name]);
+      } else {
+        c.args(["remove", &sanitized_name]);
+      }
+      c
+    }
+    "gem" => {
+      let cmd = if cfg!(target_os = "windows") { "gem" } else { "gem" };
+      let mut c = Command::new(cmd);
+      c.args(["uninstall", &sanitized_name]);
+      c
+    }
+    _ => return Err(format!("Unsupported package manager: {}", package_manager)),
   };
 
   if let Some(path) = project_path {
@@ -2817,6 +3091,9 @@ pub fn run() {
       delete_package, 
       scan_global_npm, 
       scan_global_pip,
+      scan_global_cargo,
+      scan_global_composer,
+      scan_global_gem,
       scan_system_packages,
       pick_folder, 
       get_npm_global_path, 

@@ -605,8 +605,9 @@ export const useProject = (currentProject, showToast) => {
     }
   }, [currentProject, scan])
 
-  const handleUpdateSelected = useCallback(async (packages) => {
+  const handleUpdateSelected = useCallback(async (packages, options = {}) => {
     if (!currentProject || !packages || packages.length === 0) return
+    const { silent = false } = options
     const invoke = await getInvoke()
     setBusy(true)
     let successCount = 0
@@ -661,7 +662,9 @@ export const useProject = (currentProject, showToast) => {
       }
     }
 
-    showToast(`Updated ${successCount}/${packages.length} packages`, successCount === packages.length ? 'success' : 'info')
+    if (!silent) {
+      showToast(`Updated ${successCount}/${packages.length} packages`, successCount === packages.length ? 'success' : 'info')
+    }
     
     // Cleanup progress bars
     setTimeout(() => {
@@ -676,21 +679,38 @@ export const useProject = (currentProject, showToast) => {
     }, 500)
   }, [currentProject, getInvoke, scan, showToast, availableUpdates])
 
-  const handleUpdateAll = useCallback(async () => {
+  const handleUpdateAll = useCallback(async (options = {}) => {
+    const { silent = false } = options
     const toUpdate = scanResult?.packages?.filter(p => p.manager === 'npm' && p.is_outdated) || []
     if (toUpdate.length === 0) {
       // Fallback: check availableUpdates map
       const availableNames = Array.from(availableUpdates.keys())
       const packagesToUpdate = scanResult?.packages?.filter(p => availableNames.includes(p.name)) || []
       if (packagesToUpdate.length > 0) {
-        await handleUpdateSelected(packagesToUpdate)
+        await handleUpdateSelected(packagesToUpdate, options)
       } else {
-        showToast('No updates available', 'info')
+        if (!silent) showToast('No updates available', 'info')
       }
       return
     }
-    await handleUpdateSelected(toUpdate)
+    await handleUpdateSelected(toUpdate, options)
   }, [scanResult, availableUpdates, handleUpdateSelected, showToast])
+
+  const handleAuditFix = useCallback(async () => {
+    if (!currentProject) return
+    const invoke = await getInvoke()
+    setBusy(true)
+    try {
+      console.log('[useProject] Running automatic security fix...')
+      await invoke('fix_npm_audit', { projectPath: currentProject.path })
+      showToast('Security fixes applied successfully', 'success')
+      scan(currentProject, { silent: true })
+    } catch (e) {
+      console.error('[useProject] Security fix failed:', e)
+    } finally {
+      setBusy(false)
+    }
+  }, [currentProject, getInvoke, scan, showToast])
 
   const handleDeleteSelected = useCallback(async () => {
     if (selectedPackages.size === 0 || !currentProject) return
@@ -801,7 +821,6 @@ export const useProject = (currentProject, showToast) => {
     setSearchResults,
     selectedPackages,
     setSelectedPackages,
-    installingPackages,
     filter,
     setFilter,
     sortBy,
@@ -822,6 +841,8 @@ export const useProject = (currentProject, showToast) => {
     handleDeleteSelected,
     togglePackage,
     installingPackagesHasPath,
-    runScript
+    installingPackages,
+    runScript,
+    handleAuditFix
   }
 }

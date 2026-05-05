@@ -116,6 +116,7 @@ import strapiIcon from './strapi.png'
 import sanityIcon from './sanity.png'
 import discordIcon from './discord.webp'
 import slackIcon from './slack.png'
+import nodejsIcon from './Node.js.png'
 
 export const techIcons = {
     // Core Frameworks
@@ -126,7 +127,8 @@ export const techIcons = {
     'angular': { name: 'Angular', color: 'bg-white', icon: 'A', textColor: 'text-red-600', image: angularIcon },
     'astro': { name: 'Astro', color: 'bg-white', icon: '🚀', textColor: 'text-orange-500', image: astroIcon },
     'tauri': { name: 'Tauri', color: 'bg-gray-800', icon: 'T', textColor: 'text-white', image: tauriIcon },
-    
+    'nodejs': { name: 'Node.js', color: 'bg-white', icon: 'N', textColor: 'text-green-500', image: nodejsIcon },
+
     // Languages
     'typescript': { name: 'TypeScript', color: 'bg-[#3178c6]', icon: 'TS', textColor: 'text-white', image: typescriptIcon },
     'javascript': { name: 'JavaScript', color: 'bg-yellow-400', icon: 'JS', textColor: 'text-black', image: javascriptIcon },
