@@ -1,8 +1,12 @@
 import React, { useState } from 'react'
-import { Toaster } from './components/ui/toaster'
-import { useToast } from './components/ui/use-toast'
-import { Zap, Package, Box, Cpu, Settings } from 'lucide-react'
+import { Toaster, toast } from 'sonner'
+import { Zap, Settings, Package, Cpu, Box } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+// New Icons
+import projectIcon from './assets/interfaceicons/project.svg'
+import systemIcon from './assets/interfaceicons/system.svg'
+import frameworkIcon from './assets/interfaceicons/framework.svg'
 
 // Hooks
 import { useDashboard } from './hooks/useDashboard'
@@ -30,9 +34,9 @@ const formatBytes = (bytes, decimals = 2) => {
 }
 
 const NAV_TABS = [
-  { id: 'dashboard', label: 'Project Package', icon: Package },
-  { id: 'system-packages', label: 'System Package', icon: Cpu },
-  { id: 'frameworks', label: 'Framework', icon: Box },
+  { id: 'dashboard', label: 'Project Package', img: projectIcon, /* icon: Package */ },
+  { id: 'system-packages', label: 'System Package', img: systemIcon, /* icon: Cpu */ },
+  { id: 'frameworks', label: 'Framework', img: frameworkIcon, /* icon: Box */ },
 ]
 
 // Page transition variants
@@ -51,17 +55,15 @@ function App() {
     theme: 'light',
     autoScan: true,
     notifications: true,
-    accentColor: '#9333ea'
+    accentColor: '#9333ea',
+    customScanPaths: [],
+    globalSizeThreshold: 2
   })
 
-  const { toast } = useToast()
-
   const showToast = (message, type = 'info') => {
-    toast({
-      title: type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Notification',
-      description: message,
-      variant: type === 'success' ? 'success' : type === 'error' ? 'destructive' : 'default',
-    })
+    if (type === 'success') toast.success(message)
+    else if (type === 'error') toast.error(message)
+    else toast(message)
   }
 
   const { 
@@ -168,7 +170,11 @@ function App() {
                         style={{ zIndex: -1 }}
                       />
                     )}
-                    <item.icon className={`w-4 h-4 ${activeTabId === item.id ? 'text-white' : 'text-gray-400'}`} />
+                    <img 
+                      src={item.img} 
+                      className={`w-4 h-4 object-contain ${activeTabId === item.id ? 'brightness-0 invert' : 'opacity-60'}`} 
+                      alt={item.label}
+                    />
                     {item.label}
                   </button>
                 ))}
@@ -297,7 +303,6 @@ function App() {
         setViewMode={setViewMode}
       />
 
-      <Toaster />
     </div>
   )
 }

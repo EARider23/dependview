@@ -18,6 +18,7 @@ struct InstalledPackage {
   is_global: bool,
   icon: Option<String>,
   is_declared: bool, // true if in package.json dependencies
+  is_installed: bool, // true if found in node_modules/site-packages/etc
 }
 
 #[derive(Serialize)]
@@ -48,22 +49,22 @@ fn calculate_dir_size(path: &Path) -> u64 {
 }
 
 // Read declared dependencies from package.json
-fn read_declared_dependencies(base_path: &Path) -> std::collections::HashSet<String> {
-  use std::collections::HashSet;
-  let mut declared = HashSet::new();
+fn read_declared_dependencies(base_path: &Path) -> std::collections::HashMap<String, String> {
+  use std::collections::HashMap;
+  let mut declared = HashMap::new();
   let pkg_json = base_path.join("package.json");
   
   if let Ok(content) = fs::read_to_string(&pkg_json) {
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
       // Collect dependencies and devDependencies
       if let Some(deps) = json.get("dependencies").and_then(|d| d.as_object()) {
-        for key in deps.keys() {
-          declared.insert(key.clone());
+        for (key, val) in deps {
+          declared.insert(key.clone(), val.as_str().unwrap_or("unknown").to_string());
         }
       }
       if let Some(dev_deps) = json.get("devDependencies").and_then(|d| d.as_object()) {
-        for key in dev_deps.keys() {
-          declared.insert(key.clone());
+        for (key, val) in dev_deps {
+          declared.insert(key.clone(), val.as_str().unwrap_or("unknown").to_string());
         }
       }
     }
@@ -76,75 +77,95 @@ fn scan_node_modules(base_path: &Path) -> Vec<InstalledPackage> {
   let mut packages = Vec::new();
   let node_modules = base_path.join("node_modules");
   
-  if !node_modules.exists() {
-    return packages;
-  }
-  
   // Read declared dependencies from package.json
   let declared = read_declared_dependencies(base_path);
+  let mut installed_names = std::collections::HashSet::new();
 
-  if let Ok(entries) = fs::read_dir(&node_modules) {
-    for entry in entries.flatten() {
-      let path = entry.path();
-      if path.is_dir() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        
-        // Skip hidden folders
-        if name.starts_with('.') {
-          continue;
-        }
-        
-        // Handle scoped packages (@org/pkg)
-        if name.starts_with('@') {
-          println!("[scan] Found scope folder: {}", name);
-          if let Ok(scoped_entries) = fs::read_dir(&path) {
-            for scoped_entry in scoped_entries.flatten() {
-              let scoped_path = scoped_entry.path();
-              if scoped_path.is_dir() {
-                let sub_name = scoped_entry.file_name().to_string_lossy().to_string();
-                let scoped_name = format!("{}/{}", name, sub_name);
-                println!("[scan] Found scoped package: {}", scoped_name);
-                
-                let pkg_json = scoped_path.join("package.json");
-                if !pkg_json.exists() {
-                  println!("[scan] WARNING: package.json not found for {}", scoped_name);
+  if node_modules.exists() {
+    if let Ok(entries) = fs::read_dir(&node_modules) {
+      for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+          let name = entry.file_name().to_string_lossy().to_string();
+          
+          // Skip hidden folders
+          if name.starts_with('.') {
+            continue;
+          }
+          
+          // Handle scoped packages (@org/pkg)
+          if name.starts_with('@') {
+            if let Ok(scoped_entries) = fs::read_dir(&path) {
+              for scoped_entry in scoped_entries.flatten() {
+                let scoped_path = scoped_entry.path();
+                if scoped_path.is_dir() {
+                  let sub_name = scoped_entry.file_name().to_string_lossy().to_string();
+                  let scoped_name = format!("{}/{}", name, sub_name);
+                  
+                  let pkg_json = scoped_path.join("package.json");
+                  let version = read_package_version(&pkg_json);
+                  let size = calculate_dir_size(&scoped_path);
+                  
+                  let is_declared = declared.contains_key(&scoped_name);
+                  installed_names.insert(scoped_name.clone());
+
+                  packages.push(InstalledPackage {
+                    name: scoped_name,
+                    version,
+                    manager: "npm".to_string(),
+                    path: scoped_path.to_string_lossy().to_string(),
+                    size,
+                    used: None,
+                    is_global: false,
+                    icon: read_icon_data(&scoped_path),
+                    is_declared,
+                    is_installed: true,
+                  });
                 }
-                let version = read_package_version(&pkg_json);
-                let size = calculate_dir_size(&scoped_path);
-                
-                packages.push(InstalledPackage {
-                  name: scoped_name.clone(),
-                  version,
-                  manager: "npm".to_string(),
-                  path: scoped_path.to_string_lossy().to_string(),
-                  size,
-                  used: None,
-                  is_global: false,
-                  icon: read_icon_data(&scoped_path),
-                  is_declared: declared.contains(&scoped_name),
-                });
               }
             }
+          } else {
+            // Regular package
+            let pkg_json = path.join("package.json");
+            let version = read_package_version(&pkg_json);
+            let size = calculate_dir_size(&path);
+            
+            let is_declared = declared.contains_key(&name);
+            installed_names.insert(name.clone());
+
+            packages.push(InstalledPackage {
+              name: name.clone(),
+              version,
+              manager: "npm".to_string(),
+              path: path.to_string_lossy().to_string(),
+              size,
+              used: None,
+              is_global: false,
+              icon: read_icon_data(&path),
+              is_declared,
+              is_installed: true,
+            });
           }
-        } else {
-          // Regular package
-          let pkg_json = path.join("package.json");
-          let version = read_package_version(&pkg_json);
-          let size = calculate_dir_size(&path);
-          
-          packages.push(InstalledPackage {
-            name: name.clone(),
-            version,
-            manager: "npm".to_string(),
-            path: path.to_string_lossy().to_string(),
-            size,
-            used: None,
-            is_global: false,
-            icon: read_icon_data(&path),
-            is_declared: declared.contains(&name),
-          });
         }
       }
+    }
+  }
+
+  // Add declared but NOT installed packages
+  for (name, version) in declared {
+    if !installed_names.contains(&name) {
+      packages.push(InstalledPackage {
+        name: name.clone(),
+        version: version.clone(),
+        manager: "npm".to_string(),
+        path: String::new(),
+        size: 0,
+        used: None,
+        is_global: false,
+        icon: None,
+        is_declared: true,
+        is_installed: false,
+      });
     }
   }
   
@@ -202,6 +223,25 @@ fn read_icon_data(pkg_path: &Path) -> Option<String> {
 fn scan_python_packages(base_path: &Path) -> Vec<InstalledPackage> {
   let mut packages = Vec::new();
   
+  // Read declared dependencies from requirements.txt
+  let mut declared = std::collections::HashMap::new();
+  let req_txt = base_path.join("requirements.txt");
+  if let Ok(content) = fs::read_to_string(&req_txt) {
+    for line in content.lines() {
+      let line = line.trim();
+      if line.is_empty() || line.starts_with('#') {
+        continue;
+      }
+      // Simple split on == or >= or <=
+      let pkg_name = line.split(&['=', '>', '<', ' '][..]).next().unwrap_or("").to_string();
+      if !pkg_name.is_empty() {
+        declared.insert(pkg_name, "declared".to_string());
+      }
+    }
+  }
+
+  let mut installed_names = std::collections::HashSet::new();
+
   // Common Python package locations
   let search_paths = vec![
     base_path.join("venv/lib"),
@@ -221,9 +261,34 @@ fn scan_python_packages(base_path: &Path) -> Vec<InstalledPackage> {
         let site_packages = python_ver.join("site-packages");
         
         if site_packages.exists() {
-          packages.extend(scan_site_packages(&site_packages));
+          let site_pkgs = scan_site_packages(&site_packages);
+          for mut pkg in site_pkgs {
+            if declared.contains_key(&pkg.name) {
+              pkg.is_declared = true;
+            }
+            installed_names.insert(pkg.name.clone());
+            packages.push(pkg);
+          }
         }
       }
+    }
+  }
+
+  // Add declared but not installed packages
+  for (name, _) in declared {
+    if !installed_names.contains(&name) {
+      packages.push(InstalledPackage {
+        name: name.clone(),
+        version: "pending".to_string(),
+        manager: "pip".to_string(),
+        path: base_path.join("requirements.txt").to_string_lossy().to_string(),
+        size: 0,
+        used: None,
+        is_global: false,
+        icon: None,
+        is_declared: true,
+        is_installed: false,
+      });
     }
   }
   
@@ -261,6 +326,7 @@ fn scan_site_packages(site_packages: &Path) -> Vec<InstalledPackage> {
           is_global: false,
           icon: if pkg_folder.exists() { read_icon_data(&pkg_folder) } else { read_icon_data(&path) },
           is_declared: false,
+          is_installed: true,
         });
       }
     }
@@ -272,42 +338,80 @@ fn scan_site_packages(site_packages: &Path) -> Vec<InstalledPackage> {
 // Scan Composer vendor folder for PHP packages
 fn scan_composer_packages(base_path: &Path) -> Vec<InstalledPackage> {
   let mut packages = Vec::new();
+  
+  // Read declared dependencies from composer.json
+  let mut declared = std::collections::HashMap::new();
+  let composer_json_path = base_path.join("composer.json");
+  if let Ok(content) = fs::read_to_string(&composer_json_path) {
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+      if let Some(deps) = json.get("require").and_then(|d| d.as_object()) {
+        for (key, val) in deps {
+          declared.insert(key.clone(), val.as_str().unwrap_or("unknown").to_string());
+        }
+      }
+      if let Some(dev_deps) = json.get("require-dev").and_then(|d| d.as_object()) {
+        for (key, val) in dev_deps {
+          declared.insert(key.clone(), val.as_str().unwrap_or("unknown").to_string());
+        }
+      }
+    }
+  }
+
+  let mut installed_names = std::collections::HashSet::new();
   let vendor = base_path.join("vendor");
   
-  if !vendor.exists() {
-    return packages;
-  }
-  
-  if let Ok(entries) = fs::read_dir(&vendor) {
-    for entry in entries.flatten() {
-      let org_path = entry.path();
-      if org_path.is_dir() {
-        let org_name = entry.file_name().to_string_lossy().to_string();
-        
-        if let Ok(pkg_entries) = fs::read_dir(&org_path) {
-          for pkg_entry in pkg_entries.flatten() {
-            let pkg_path = pkg_entry.path();
-            if pkg_path.is_dir() {
-              let pkg_name = format!("{}/{}", org_name, pkg_entry.file_name().to_string_lossy());
-              let composer_json = pkg_path.join("composer.json");
-              let version = read_composer_version(&composer_json);
-              let size = calculate_dir_size(&pkg_path);
-              
-              packages.push(InstalledPackage {
-                name: pkg_name,
-                version,
-                manager: "composer".to_string(),
-                path: pkg_path.to_string_lossy().to_string(),
-                size,
-                used: None,
-                is_global: false,
-                icon: read_icon_data(&pkg_path),
-                is_declared: false,
-              });
+  if vendor.exists() {
+    if let Ok(entries) = fs::read_dir(&vendor) {
+      for entry in entries.flatten() {
+        let org_path = entry.path();
+        if org_path.is_dir() {
+          let org_name = entry.file_name().to_string_lossy().to_string();
+          
+          if let Ok(pkg_entries) = fs::read_dir(&org_path) {
+            for pkg_entry in pkg_entries.flatten() {
+              let pkg_path = pkg_entry.path();
+              if pkg_path.is_dir() {
+                let pkg_name = format!("{}/{}", org_name, pkg_entry.file_name().to_string_lossy());
+                let composer_json = pkg_path.join("composer.json");
+                let version = read_composer_version(&composer_json);
+                let size = calculate_dir_size(&pkg_path);
+                
+                installed_names.insert(pkg_name.clone());
+                packages.push(InstalledPackage {
+                  name: pkg_name.clone(),
+                  version,
+                  manager: "composer".to_string(),
+                  path: pkg_path.to_string_lossy().to_string(),
+                  size,
+                  used: None,
+                  is_global: false,
+                  icon: read_icon_data(&pkg_path),
+                  is_declared: declared.contains_key(&pkg_name),
+                  is_installed: true,
+                });
+              }
             }
           }
         }
       }
+    }
+  }
+
+  // Add declared but not installed
+  for (name, ver) in declared {
+    if !installed_names.contains(&name) {
+      packages.push(InstalledPackage {
+        name: name.clone(),
+        version: ver,
+        manager: "composer".to_string(),
+        path: composer_json_path.to_string_lossy().to_string(),
+        size: 0,
+        used: None,
+        is_global: false,
+        icon: None,
+        is_declared: true,
+        is_installed: false,
+      });
     }
   }
   
@@ -347,82 +451,73 @@ fn scan_flutter_packages(base_path: &Path) -> Vec<InstalledPackage> {
     }
   }
   
+  let mut installed_names = std::collections::HashSet::new();
+
   // Check .dart_tool/package_config.json for used packages
   let package_config = base_path.join(".dart_tool/package_config.json");
-  if !package_config.exists() {
-    println!("Flutter: No .dart_tool/package_config.json found at {:?}", package_config);
-    return packages;
-  }
-  
-  println!("Flutter: Scanning packages from {:?}", package_config);
-  
-  if let Ok(content) = fs::read_to_string(&package_config) {
-    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-      if let Some(pkgs) = json.get("packages").and_then(|p| p.as_array()) {
-        println!("Flutter: Found {} packages in config", pkgs.len());
-        
-        for pkg in pkgs {
-          if let (Some(name), Some(root_uri)) = (
-            pkg.get("name").and_then(|n| n.as_str()),
-            pkg.get("rootUri").and_then(|u| u.as_str())
-          ) {
-            // Skip relative paths pointing to project itself
-            if root_uri.starts_with("../") {
-              println!("Flutter: Skipping project package: {}", name);
-              continue;
-            }
-            
-            // Parse the path from rootUri
-            let pkg_path = if root_uri.starts_with("file://") {
-              let path_str = root_uri.replace("file://", "").replace("file:///", "");
-              // Handle Windows paths
-              let cleaned = if cfg!(target_os = "windows") && path_str.starts_with('/') {
-                path_str.trim_start_matches('/').to_string()
+  if package_config.exists() {
+    println!("Flutter: Scanning packages from {:?}", package_config);
+    if let Ok(content) = fs::read_to_string(&package_config) {
+      if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let Some(pkgs) = json.get("packages").and_then(|p| p.as_array()) {
+          for pkg in pkgs {
+            if let (Some(name), Some(root_uri)) = (
+              pkg.get("name").and_then(|n| n.as_str()),
+              pkg.get("rootUri").and_then(|u| u.as_str())
+            ) {
+              if root_uri.starts_with("../") { continue; }
+              let pkg_path = if root_uri.starts_with("file://") {
+                let path_str = root_uri.replace("file://", "").replace("file:///", "");
+                let cleaned = if cfg!(target_os = "windows") && path_str.starts_with('/') {
+                  path_str.trim_start_matches('/').to_string()
+                } else {
+                  path_str
+                };
+                PathBuf::from(cleaned)
               } else {
-                path_str
+                base_path.join(root_uri)
               };
-              PathBuf::from(cleaned)
-            } else {
-              base_path.join(root_uri)
-            };
-            
-            // Skip if path doesn't exist
-            if !pkg_path.exists() {
-              println!("Flutter: Package path doesn't exist: {:?}", pkg_path);
-              continue;
+              
+              if !pkg_path.exists() { continue; }
+              
+              let size = calculate_dir_size(&pkg_path);
+              let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+              
+              installed_names.insert(name.to_string());
+              packages.push(InstalledPackage {
+                name: name.to_string(),
+                version,
+                manager: "flutter".to_string(),
+                path: pkg_path.to_string_lossy().to_string(),
+                size,
+                used: None,
+                is_global: false,
+                icon: read_icon_data(&pkg_path),
+                is_declared: declared.contains(name),
+                is_installed: true,
+              });
             }
-            
-            // Check if it's a local project package by checking if it's inside base_path
-            let canonical_base = base_path.canonicalize().ok();
-            let canonical_pkg = pkg_path.canonicalize().ok();
-            
-            if let (Some(base), Some(pkg)) = (canonical_base, canonical_pkg) {
-              // Skip if package is inside the project folder (except .dart_tool)
-              if pkg.starts_with(&base) && !pkg.to_string_lossy().contains(".dart_tool") {
-                println!("Flutter: Skipping local project package: {}", name);
-                continue;
-              }
-            }
-            
-            let size = calculate_dir_size(&pkg_path);
-            let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-            
-            println!("Flutter: Adding package {} v{} from {:?}", name, version, pkg_path);
-            
-            packages.push(InstalledPackage {
-              name: name.to_string(),
-              version,
-              manager: "flutter".to_string(),
-              path: pkg_path.to_string_lossy().to_string(),
-              size,
-              used: None,
-              is_global: false,
-              icon: read_icon_data(&pkg_path),
-              is_declared: declared.contains(name),
-            });
           }
         }
       }
+    }
+  }
+
+  // Add declared but not installed
+  for name in declared {
+    if !installed_names.contains(&name) {
+      packages.push(InstalledPackage {
+        name: name.clone(),
+        version: "pending".to_string(),
+        manager: "flutter".to_string(),
+        path: pubspec.to_string_lossy().to_string(),
+        size: 0,
+        used: None,
+        is_global: false,
+        icon: None,
+        is_declared: true,
+        is_installed: false,
+      });
     }
   }
   
@@ -433,7 +528,26 @@ fn scan_flutter_packages(base_path: &Path) -> Vec<InstalledPackage> {
 // Scan Rust target folder for dependencies
 fn scan_cargo_packages(base_path: &Path) -> Vec<InstalledPackage> {
   let mut packages = Vec::new();
-  
+  let mut declared = std::collections::HashSet::new();
+  let mut installed_names = std::collections::HashSet::new();
+
+  // Read Cargo.toml for declared dependencies
+  let cargo_toml = base_path.join("Cargo.toml");
+  if let Ok(content) = fs::read_to_string(&cargo_toml) {
+    if let Ok(toml_val) = toml::from_str::<toml::Value>(&content) {
+      if let Some(deps) = toml_val.get("dependencies").and_then(|d| d.as_table()) {
+        for key in deps.keys() {
+          declared.insert(key.clone());
+        }
+      }
+      if let Some(dev_deps) = toml_val.get("dev-dependencies").and_then(|d| d.as_table()) {
+        for key in dev_deps.keys() {
+          declared.insert(key.clone());
+        }
+      }
+    }
+  }
+
   // Read Cargo.lock to find dependencies
   let cargo_lock = base_path.join("Cargo.lock");
   if cargo_lock.exists() {
@@ -445,24 +559,41 @@ fn scan_cargo_packages(base_path: &Path) -> Vec<InstalledPackage> {
               pkg.get("name").and_then(|n| n.as_str()),
               pkg.get("version").and_then(|v| v.as_str())
             ) {
-              // Cargo packages are in CARGO_HOME or target/
-              let size = 0; // Would need to scan CARGO_HOME/registry
-              
+              installed_names.insert(name.to_string());
               packages.push(InstalledPackage {
                 name: name.to_string(),
                 version: version.to_string(),
                 manager: "cargo".to_string(),
                 path: "~/.cargo/registry".to_string(),
-                size,
+                size: 0,
                 used: None,
                 is_global: true,
                 icon: None,
-                is_declared: false,
+                is_declared: declared.contains(name),
+                is_installed: true,
               });
             }
           }
         }
       }
+    }
+  }
+
+  // Add declared but not in lock file
+  for name in declared {
+    if !installed_names.contains(&name) {
+      packages.push(InstalledPackage {
+        name: name.clone(),
+        version: "pending".to_string(),
+        manager: "cargo".to_string(),
+        path: cargo_toml.to_string_lossy().to_string(),
+        size: 0,
+        used: None,
+        is_global: false,
+        icon: None,
+        is_declared: true,
+        is_installed: false,
+      });
     }
   }
   
@@ -632,6 +763,7 @@ fn read_npm_package_info(path: &Path, name: &str) -> Option<InstalledPackage> {
           is_global: true,
           icon: read_icon_data(path),
           is_declared: false,
+          is_installed: true,
         });
       }
     }
@@ -669,6 +801,7 @@ fn scan_global_yarn() -> Vec<InstalledPackage> {
                                         is_global: true,
                                         icon: None,
                                         is_declared: false,
+                                        is_installed: true,
                                     });
                                 }
                             }
@@ -711,6 +844,7 @@ fn scan_global_pnpm() -> Vec<InstalledPackage> {
                                         is_global: true,
                                         icon: if !path.is_empty() { read_icon_data(Path::new(&path)) } else { None },
                                         is_declared: false,
+                                        is_installed: true,
                                     });
                                 }
                             }
@@ -777,6 +911,7 @@ fn scan_global_pip() -> Vec<InstalledPackage> {
                                                         is_global: true,
                                                         icon: read_icon_data(&path),
                                                         is_declared: false,
+                                                        is_installed: true,
                                                     });
                                                 }
                                             }
@@ -845,6 +980,7 @@ fn scan_global_cargo() -> Vec<InstalledPackage> {
                                 is_global: true,
                                 icon: None,
                                 is_declared: false,
+                                is_installed: true,
                             });
                         }
                     }
@@ -880,6 +1016,7 @@ fn scan_global_composer() -> Vec<InstalledPackage> {
                                     is_global: true,
                                     icon: None,
                                     is_declared: false,
+                                    is_installed: true,
                                 });
                             }
                         }
@@ -919,6 +1056,7 @@ fn scan_global_gem() -> Vec<InstalledPackage> {
                                 is_global: true,
                                 icon: None,
                                 is_declared: false,
+                                is_installed: true,
                             });
                         }
                     }
@@ -1995,9 +2133,151 @@ fn detect_package_manager(project_path: String) -> String {
   "npm".to_string()
 }
 
+// Sync/Install all dependencies for a project (Migration to Isolated Shielding)
+#[tauri::command]
+async fn sync_project(
+  app: tauri::AppHandle,
+  project_path: String,
+) -> Result<String, String> {
+  use std::process::Command;
+  let path = Path::new(&project_path);
+  let manager = detect_package_manager(project_path.clone());
+  
+  println!("[sync_project] Starting Migration/Sync. Path: {}, Manager: {}", project_path, manager);
+
+  // PRE-FLIGHT: For Python, ensure venv exists before syncing
+  if manager == "pip" {
+    if detect_venv(path).is_none() {
+      println!("[sync_project] Python venv missing. Creating it first...");
+      let _ = app.emit("install-log", serde_json::json!({ 
+        "stream": "stdout", 
+        "line": "Creating Virtual Environment (Shielding)...",
+        "package": "system"
+      }));
+      
+      let mut venv_cmd = Command::new(if cfg!(target_os = "windows") { "python.exe" } else { "python3" });
+      venv_cmd.args(["-m", "venv", "venv"]);
+      venv_cmd.current_dir(path);
+      let status = venv_cmd.status().map_err(|e| e.to_string())?;
+      if !status.success() {
+        return Err("Failed to create virtual environment during migration".to_string());
+      }
+    }
+  }
+
+  let mut cmd = match manager.as_str() {
+    "npm" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" });
+      c.arg("install");
+      c
+    }
+    "pnpm" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "pnpm.cmd" } else { "pnpm" });
+      c.arg("install");
+      c
+    }
+    "yarn" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "yarn.cmd" } else { "yarn" });
+      c.arg("install");
+      c
+    }
+    "bun" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "bun.exe" } else { "bun" });
+      c.arg("install");
+      c
+    }
+    "pip" => {
+      // Now we know venv exists
+      let python_cmd = if let Some(venv_path) = detect_venv(path) {
+        if cfg!(target_os = "windows") { venv_path.join("Scripts").join("python.exe") }
+        else { venv_path.join("bin").join("python") }
+      } else {
+        PathBuf::from(if cfg!(target_os = "windows") { "python.exe" } else { "python" })
+      };
+      let mut c = Command::new(python_cmd);
+      c.args(["-m", "pip", "install", "-r", "requirements.txt"]);
+      c
+    }
+    "pub" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "flutter.bat" } else { "flutter" });
+      c.args(["pub", "get"]);
+      c
+    }
+    "cargo" => {
+      let mut c = Command::new(if cfg!(target_os = "windows") { "cargo.exe" } else { "cargo" });
+      c.arg("build");
+      c
+    }
+    _ => return Err("Unsupported package manager for sync".to_string()),
+  };
+
+  cmd.current_dir(path);
+
+  let mut child = cmd
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::piped())
+    .spawn()
+    .map_err(|e| e.to_string())?;
+
+  let app_handle = app.clone();
+  let manager_name = manager.clone();
+
+  // Stream output
+  if let Some(stdout) = child.stdout.take() {
+    let ah = app_handle.clone();
+    let m = manager_name.clone();
+    std::thread::spawn(move || {
+      use std::io::{BufRead, BufReader};
+      let reader = BufReader::new(stdout);
+      for line in reader.lines() {
+        if let Ok(l) = line {
+          let _ = ah.emit("install-log", serde_json::json!({ 
+            "stream": "stdout", 
+            "line": l,
+            "package": m
+          }));
+        }
+      }
+    });
+  }
+
+  if let Some(stderr) = child.stderr.take() {
+    let ah = app_handle.clone();
+    let m = manager_name.clone();
+    std::thread::spawn(move || {
+      use std::io::{BufRead, BufReader};
+      let reader = BufReader::new(stderr);
+      for line in reader.lines() {
+        if let Ok(l) = line {
+          let _ = ah.emit("install-log", serde_json::json!({ 
+            "stream": "stderr", 
+            "line": l,
+            "package": m
+          }));
+        }
+      }
+    });
+  }
+
+  let status = child.wait().map_err(|e| e.to_string())?;
+  
+  // Final notification
+  let _ = app_handle.emit("install-log", serde_json::json!({ 
+    "stream": "exit", 
+    "code": status.code(),
+    "package": manager_name 
+  }));
+
+  if status.success() {
+    Ok(format!("Successfully migrated project to isolated environment ({})", manager))
+  } else {
+    Err(format!("Migration failed with exit code: {:?}", status.code()))
+  }
+}
+
 // Install package command
 #[tauri::command]
-fn install_package(
+async fn install_package(
   app: tauri::AppHandle,
   package_manager: String,
   package_name: String,
@@ -2098,12 +2378,17 @@ fn install_package(
   // stdout thread
   if let Some(stdout) = child.stdout.take() {
     let ah = app_handle.clone();
+    let pkg = sanitized_name.clone();
     std::thread::spawn(move || {
       use std::io::{BufRead, BufReader};
       let reader = BufReader::new(stdout);
       for line in reader.lines() {
         if let Ok(l) = line {
-          let _ = ah.emit("install-log", serde_json::json!({ "stream": "stdout", "line": l }));
+          let _ = ah.emit("install-log", serde_json::json!({ 
+            "stream": "stdout", 
+            "line": l,
+            "package": pkg
+          }));
         }
       }
     });
@@ -2112,29 +2397,37 @@ fn install_package(
   // stderr thread
   if let Some(stderr) = child.stderr.take() {
     let ah = app_handle.clone();
+    let pkg = sanitized_name.clone();
     std::thread::spawn(move || {
       use std::io::{BufRead, BufReader};
       let reader = BufReader::new(stderr);
       for line in reader.lines() {
         if let Ok(l) = line {
-          let _ = ah.emit("install-log", serde_json::json!({ "stream": "stderr", "line": l }));
+          let _ = ah.emit("install-log", serde_json::json!({ 
+            "stream": "stderr", 
+            "line": l,
+            "package": pkg
+          }));
         }
       }
     });
   }
 
   // Wait for exit
-  let ah = app_handle.clone();
-  let pkg_name = sanitized_name.clone();
-  std::thread::spawn(move || {
-    if let Ok(exit) = child.wait() {
-      let code = exit.code();
-      println!("[install_package] Finished with exit code: {:?}", code);
-      let _ = ah.emit("install-log", serde_json::json!({ "stream": "exit", "code": code, "package": pkg_name }));
-    }
-  });
+  let status = child.wait().map_err(|e| format!("Failed to wait for process: {}", e))?;
+  
+  // Emit exit event
+  let _ = app_handle.emit("install-log", serde_json::json!({ 
+    "stream": "exit", 
+    "code": status.code(),
+    "package": sanitized_name 
+  }));
 
-  Ok("Installation started".to_string())
+  if status.success() {
+    Ok(format!("Successfully installed {}", sanitized_name))
+  } else {
+    Err(format!("Installation failed with exit code: {:?}", status.code()))
+  }
 }
 
 // Remove package command
@@ -2262,7 +2555,7 @@ fn remove_package(
 
 // Update package command
 #[tauri::command]
-fn update_package(
+async fn update_package(
   app: tauri::AppHandle,
   package_manager: String,
   package_name: String,
@@ -2353,12 +2646,17 @@ fn update_package(
   // stdout thread
   if let Some(stdout) = child.stdout.take() {
     let ah = app_handle.clone();
+    let pkg = package_name.clone();
     std::thread::spawn(move || {
       use std::io::{BufRead, BufReader};
       let reader = BufReader::new(stdout);
       for line in reader.lines() {
         if let Ok(l) = line {
-          let _ = ah.emit("update-log", serde_json::json!({ "stream": "stdout", "line": l }));
+          let _ = ah.emit("install-log", serde_json::json!({ 
+            "stream": "stdout", 
+            "line": l,
+            "package": pkg
+          }));
         }
       }
     });
@@ -2367,12 +2665,17 @@ fn update_package(
   // stderr thread
   if let Some(stderr) = child.stderr.take() {
     let ah = app_handle.clone();
+    let pkg = package_name.clone();
     std::thread::spawn(move || {
       use std::io::{BufRead, BufReader};
       let reader = BufReader::new(stderr);
       for line in reader.lines() {
         if let Ok(l) = line {
-          let _ = ah.emit("update-log", serde_json::json!({ "stream": "stderr", "line": l }));
+          let _ = ah.emit("install-log", serde_json::json!({ 
+            "stream": "stderr", 
+            "line": l,
+            "package": pkg
+          }));
         }
       }
     });
@@ -2382,7 +2685,7 @@ fn update_package(
   let status = child.wait().map_err(|e| format!("Failed to wait for process: {}", e))?;
   
   // Emit exit event
-  let _ = app_handle.emit("update-log", serde_json::json!({ 
+  let _ = app_handle.emit("install-log", serde_json::json!({ 
     "stream": "exit", 
     "code": status.code(),
     "package": package_name 
@@ -2926,11 +3229,20 @@ fn read_package_scripts(project_path: String) -> Result<serde_json::Value, Strin
 #[tauri::command]
 fn run_package_script(project_path: String, script_name: String) -> Result<String, String> {
     use std::process::Command;
+    let manager = detect_package_manager(project_path.clone());
+    let normalized_path = project_path.trim_end_matches('\\').trim_end_matches('/');
+
     if cfg!(target_os = "windows") {
+        use std::os::windows::process::CommandExt;
+        
+        // Use CREATE_NEW_CONSOLE (0x00000010) to open a fresh CMD window 
+        // without the quoting headaches of the 'start' command.
         match Command::new("cmd")
-            .args(["/C", "start", "cmd", "/K", &format!("cd /d \"{}\" && npm run {}", project_path, script_name)])
+            .args(["/K", &format!("{} run {}", manager, script_name)])
+            .current_dir(normalized_path)
+            .creation_flags(0x00000010) 
             .spawn() {
-            Ok(_) => Ok(format!("Started npm run {}", script_name)),
+            Ok(_) => Ok(format!("Started {} run {}", manager, script_name)),
             Err(e) => Err(e.to_string())
         }
     } else {
@@ -3103,6 +3415,7 @@ pub fn run() {
       detect_project_technologies,
       delete_project_folder,
       install_package,
+      sync_project,
       update_package,
       remove_package,
       search_packages,

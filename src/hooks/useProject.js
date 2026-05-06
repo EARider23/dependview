@@ -216,21 +216,6 @@ export const useProject = (currentProject, showToast) => {
       const manager = await invoke('detect_package_manager', { projectPath: currentProject.path })
       console.log(`[useProject] Installation will use manager: ${manager}`)
 
-      // STABLE PROGRESS ORCHESTRATION
-      let currentProgress = 5
-      const progressInterval = setInterval(() => {
-        setInstallingPackages(prev => {
-          const state = prev.get(baseName)
-          if (!state) {
-            clearInterval(progressInterval)
-            return prev
-          }
-          const increment = currentProgress > 80 ? 2 : 8
-          currentProgress = Math.min(95, currentProgress + increment)
-          return new Map(prev).set(baseName, { ...state, progress: currentProgress })
-        })
-      }, 250)
-
       // ATOMIC NAME LOCK: Use the baseName exactly as provided (no auto-scoping)
       // If user wants a scoped package, they should include the @ in search or input.
       let finalInstallName = baseName
@@ -240,49 +225,62 @@ export const useProject = (currentProject, showToast) => {
 
       console.log(`[useProject] EXEC INSTALL: "${finalInstallName}" (Manager: ${manager})`)
 
-      
-      await invoke('install_package', {
-        packageManager: manager,
-        packageName: finalInstallName,
-        projectPath: currentProject.path,
-        isGlobal: false
-      })
-
-      // WAIT FOR ACTUAL COMPLETION VIA LOG EVENT
+      // Execute installation and listener in parallel
       const listen = await getListen()
-      await new Promise((resolve, reject) => {
-        let unlisten
-        const timeout = setTimeout(() => {
-          if (unlisten) unlisten()
-          reject(new Error('Installation timed out after 10 minutes. It may still be running in the background.'))
-        }, 600000) // Increased to 10 minutes for slow Windows environments
-        listen('install-log', (event) => {
-          // Stream logs to console for debugging
-          if (event.payload.line) {
-            const line = event.payload.line.trim()
-            if (line) {
-              console.log(`[install:${manager}] ${line}`)
+      let unlisten;
+
+      const setupListener = async () => {
+        unlisten = await listen('install-log', (event) => {
+          const { package: pkgName, line, stream, code } = event.payload;
+          if (pkgName !== baseName && pkgName !== finalInstallName) return;
+
+          if (line) {
+            const l = line.trim()
+            if (l) {
               setInstallingPackages(prev => {
                 const state = prev.get(baseName)
                 if (state) {
-                  return new Map(prev).set(baseName, { ...state, lastLog: line.substring(0, 60) })
+                  let newProgress = state.progress;
+                  
+                  // MB parsing for pip
+                  const mbMatch = line.match(/(\d+\.?\d*)\/(\d+\.?\d*)\s*MB/);
+                  if (mbMatch) {
+                    const currentMB = parseFloat(mbMatch[1]);
+                    const totalMB = parseFloat(mbMatch[2]);
+                    newProgress = Math.round((currentMB / totalMB) * 100);
+                  } else {
+                    // Fallback incremental progress
+                    newProgress = Math.min(98, newProgress + 1);
+                  }
+
+                  return new Map(prev).set(baseName, { 
+                    ...state, 
+                    progress: newProgress,
+                    lastLog: l.substring(0, 60),
+                    throughput: line.match(/\d+\.?\d*\s*MB\/s/)?.[0] || state.throughput
+                  })
                 }
                 return prev
               })
             }
           }
+        });
+      };
 
-          if (event.payload.stream === 'exit' && (event.payload.package === baseName || event.payload.package === finalInstallName)) {
-            clearTimeout(timeout)
-            if (unlisten) unlisten()
-            if (event.payload.code === 0) resolve()
-            else reject(new Error(`Process exited with code ${event.payload.code}`))
-          }
-        }).then(u => unlisten = u)
-      })
+      await setupListener();
+      
+      try {
+        await invoke('install_package', {
+          packageManager: manager,
+          packageName: finalInstallName,
+          projectPath: currentProject.path,
+          isGlobal: false
+        })
+      } finally {
+        if (unlisten) unlisten();
+      }
 
-      clearInterval(progressInterval)
-      setInstallingPackages(prev => new Map(prev).set(baseName, { progress: 100, type: 'install' }))
+      setInstallingPackages(prev => new Map(prev).set(baseName, { progress: 100, type: 'install', lastLog: 'Complete' }))
       
       showToast(`${finalInstallName} installed successfully`, 'success')
 
@@ -292,9 +290,7 @@ export const useProject = (currentProject, showToast) => {
           next.delete(baseName)
           return next
         })
-        // Silent scan will now run after we're sure the install is done
         scan(currentProject, { silent: true })
-        // Clear search state only after successful installation and scan
         setSearchResults([])
         setSearchQuery('')
       }, 800)
@@ -308,7 +304,69 @@ export const useProject = (currentProject, showToast) => {
     } finally {
       setBusy(false)
     }
-  }, [currentProject, scanResult, getInvoke, scan, showToast])
+  }, [currentProject, getInvoke, getListen, scan, showToast])
+  
+  const syncProject = useCallback(async () => {
+    if (!currentProject) return
+    const invoke = await getInvoke()
+    setBusy(true)
+    setInstallingPackages(prev => new Map(prev).set('PROJECT_SYNC', { progress: 5, type: 'sync', lastLog: 'Initializing sync...' }))
+    
+    try {
+      const listen = await getListen()
+      let unlisten;
+
+      const setupListener = async () => {
+        unlisten = await listen('install-log', (event) => {
+          const { line } = event.payload;
+          if (line) {
+            setInstallingPackages(prev => {
+              const state = prev.get('PROJECT_SYNC')
+              if (state) {
+                return new Map(prev).set('PROJECT_SYNC', { 
+                  ...state, 
+                  progress: Math.min(98, state.progress + 1),
+                  lastLog: line.trim().substring(0, 60)
+                })
+              }
+              return prev
+            })
+          }
+        });
+      };
+
+      await setupListener();
+      
+      try {
+        await invoke('sync_project', {
+          projectPath: currentProject.path
+        })
+      } finally {
+        if (unlisten) unlisten();
+      }
+
+      setInstallingPackages(prev => new Map(prev).set('PROJECT_SYNC', { progress: 100, type: 'sync', lastLog: 'Sync complete' }))
+      showToast(`Project synced successfully`, 'success')
+
+      setTimeout(() => {
+        setInstallingPackages(prev => {
+          const next = new Map(prev)
+          next.delete('PROJECT_SYNC')
+          return next
+        })
+        scan(currentProject, { silent: true })
+      }, 800)
+    } catch (e) {
+      showToast(`Sync failed: ${e}`, 'error')
+      setInstallingPackages(prev => {
+        const next = new Map(prev)
+        next.delete('PROJECT_SYNC')
+        return next
+      })
+    } finally {
+      setBusy(false)
+    }
+  }, [currentProject, getInvoke, getListen, scan, showToast])
 
 
   const handleUpdate = useCallback(async (packageName) => {
@@ -334,28 +392,58 @@ export const useProject = (currentProject, showToast) => {
     setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 0, type: 'update' }))
     
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setInstallingPackages(prev => {
-          const state = prev.get(packageName)
-          if (!state || state.progress >= 90) {
-            clearInterval(progressInterval)
-            return prev
+      const listen = await getListen()
+      let unlisten;
+
+      const setupListener = async () => {
+        unlisten = await listen('install-log', (event) => {
+          const { package: pkgName, line, stream } = event.payload;
+          if (pkgName !== packageName) return;
+
+          if (line) {
+            const l = line.trim()
+            if (l) {
+              setInstallingPackages(prev => {
+                const state = prev.get(packageName)
+                if (state) {
+                  let newProgress = state.progress;
+                  const mbMatch = line.match(/(\d+\.?\d*)\/(\d+\.?\d*)\s*MB/);
+                  if (mbMatch) {
+                    const currentMB = parseFloat(mbMatch[1]);
+                    const totalMB = parseFloat(mbMatch[2]);
+                    newProgress = Math.round((currentMB / totalMB) * 100);
+                  } else {
+                    newProgress = Math.min(98, newProgress + 1);
+                  }
+                  return new Map(prev).set(packageName, { 
+                    ...state, 
+                    progress: newProgress,
+                    lastLog: l.substring(0, 60),
+                    throughput: line.match(/\d+\.?\d*\s*MB\/s/)?.[0] || state.throughput
+                  })
+                }
+                return prev
+              })
+            }
           }
-          return new Map(prev).set(packageName, { ...state, progress: state.progress + 10 })
-        })
-      }, 200)
+        });
+      };
+
+      await setupListener();
 
       const manager = currentPkg?.manager || 'npm'
-      await invoke('update_package', {
-        packageManager: manager,
-        packageName: packageName,
-        projectPath: currentProject.path,
-        isGlobal: false
-      })
+      try {
+        await invoke('update_package', {
+          packageManager: manager,
+          packageName: packageName,
+          projectPath: currentProject.path,
+          isGlobal: false
+        })
+      } finally {
+        if (unlisten) unlisten();
+      }
       
-      clearInterval(progressInterval)
-      setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 100, type: 'update' }))
+      setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 100, type: 'update', lastLog: 'Complete' }))
       
       // Optimistic UI Update: Update version and clear outdated status immediately
       setScanResult(prev => {
@@ -413,28 +501,47 @@ export const useProject = (currentProject, showToast) => {
     setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 0, type: 'revert' }))
     
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setInstallingPackages(prev => {
-          const state = prev.get(packageName)
-          if (!state || state.progress >= 90) {
-            clearInterval(progressInterval)
-            return prev
+      const listen = await getListen()
+      let unlisten;
+
+      const setupListener = async () => {
+        unlisten = await listen('install-log', (event) => {
+          const { package: pkgName, line } = event.payload;
+          // Revert might use packageName@version in some events, but base name is safer for UI
+          if (!pkgName?.startsWith(packageName)) return;
+
+          if (line) {
+            const l = line.trim()
+            if (l) {
+              setInstallingPackages(prev => {
+                const state = prev.get(packageName)
+                if (state) {
+                  let newProgress = state.progress;
+                  newProgress = Math.min(98, newProgress + 2);
+                  return new Map(prev).set(packageName, { ...state, progress: newProgress, lastLog: l.substring(0, 60) })
+                }
+                return prev
+              })
+            }
           }
-          return new Map(prev).set(packageName, { ...state, progress: state.progress + 10 })
-        })
-      }, 200)
+        });
+      };
+
+      await setupListener();
 
       const manager = scanResult?.packages?.find(p => p.name === packageName)?.manager || 'npm'
-      await invoke('update_package', {
-        packageManager: manager,
-        packageName: `${packageName}@${targetVersion}`,
-        projectPath: currentProject.path,
-        isGlobal: false
-      })
+      try {
+        await invoke('update_package', {
+          packageManager: manager,
+          packageName: `${packageName}@${targetVersion}`,
+          projectPath: currentProject.path,
+          isGlobal: false
+        })
+      } finally {
+        if (unlisten) unlisten();
+      }
       
-      clearInterval(progressInterval)
-      setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 100, type: 'revert' }))
+      setInstallingPackages(prev => new Map(prev).set(packageName, { progress: 100, type: 'revert', lastLog: 'Complete' }))
       showToast(`Reverted ${packageName} to v${targetVersion}`, 'success')
       
       // Update history: remove version we just reverted to and any versions after it
@@ -471,15 +578,14 @@ export const useProject = (currentProject, showToast) => {
     }
   }, [currentProject, packageVersionHistory, scanResult, getInvoke, scan, showToast])
 
-  const handleDelete = useCallback(async (packageName) => {
-    if (!currentProject) return
-    if (!confirm(`Are you sure you want to uninstall ${packageName}?`)) return
+  const handleDelete = useCallback(async (pkg) => {
+    if (!currentProject || !pkg) return
 
     const invoke = await getInvoke()
     setBusy(true)
     try {
-      const pkg = scanResult?.packages?.find(p => p.name === packageName)
-      if (!pkg?.path) throw new Error('Package path not found')
+      const packageName = pkg.name
+      if (!pkg.path) throw new Error('Package path not found')
 
       // Optimistic UI: Remove from state immediately
       setScanResult(prev => ({
@@ -508,7 +614,7 @@ export const useProject = (currentProject, showToast) => {
     } finally {
       setBusy(false)
     }
-  }, [currentProject, scanResult, getInvoke, scan, showToast])
+  }, [currentProject, getInvoke, scan, showToast])
 
   const openFolder = useCallback(async (path) => {
     if (!path) return
@@ -587,7 +693,7 @@ export const useProject = (currentProject, showToast) => {
     const invoke = await getInvoke()
     try {
       showToast(`Running script: ${scriptName}`, 'info')
-      await invoke('run_script', { 
+      await invoke('run_package_script', { 
         projectPath: currentProject.path, 
         scriptName 
       })
@@ -838,6 +944,7 @@ export const useProject = (currentProject, showToast) => {
     openFolder,
     handleUpdateSelected,
     handleUpdateAll,
+    syncProject,
     handleDeleteSelected,
     togglePackage,
     installingPackagesHasPath,

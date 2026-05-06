@@ -13,9 +13,12 @@ import {
     DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 
-export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, onRevert, hasUpdate, latestVersion, isInstalling, installProgress, installType, viewMode = 'grid', verified = false, versionHistory = [], projectPath, venvPath, openFolder, formatBytes }) => {
+export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, onRevert, hasUpdate, latestVersion, isInstalling, installProgress, installType, lastLog, throughput, viewMode = 'grid', verified = false, versionHistory = [], projectPath, venvPath, openFolder, formatBytes }) => {
     // Status Logic - strictly check for true
-    const isActive = pkg.is_declared === true
+    const isDeclared = pkg.is_declared === true
+    const isInstalled = pkg.is_installed === true
+    const isActive = isDeclared && isInstalled
+    const isPending = isDeclared && !isInstalled
     const managerIcon = getTechIcon(pkg.manager)
 
     const techIconData = getBestIcon(pkg.name)
@@ -23,7 +26,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
     // Helper handlers to use stable function references from parent
     const handleToggle = () => onToggle?.(pkg.path);
     const handleUpdate = (e) => { e.stopPropagation(); onUpdate?.(pkg.name); };
-    const handleDelete = () => onDelete?.(pkg.path);
+    const handleDelete = () => onDelete?.(pkg);
     const handleRevert = (version) => onRevert?.(pkg.name, version);
     const handleOpenFolder = () => openFolder?.(pkg.path);
 
@@ -85,35 +88,48 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     <div className="flex flex-col items-end">
                         <span className="text-[11px] font-bold font-mono text-slate-800 uppercase tracking-tighter">{formatBytes(pkg.size)}</span>
                         <div className="flex items-center gap-1">
-                            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-slate-300'}`} />
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-emerald-600' : 'text-slate-600'}`}>{isActive ? 'Active' : 'Idle'}</span>
+                            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : isPending ? 'bg-amber-400 animate-pulse' : 'bg-slate-300'}`} />
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-emerald-600' : isPending ? 'text-amber-600' : 'text-slate-600'}`}>
+                                {isActive ? 'Active' : isPending ? 'Pending' : 'Idle'}
+                            </span>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-1">
-                        {(hasUpdate || isInstalling) && (
+                        {(hasUpdate || isPending || isInstalling) && (
                             <div className="mr-1">
                                 {isInstalling ? (
-                                    <div className="flex items-center gap-2.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-300 min-w-[180px] shadow-sm">
-                                        <RefreshCw className="w-3 h-3 text-amber-600 animate-spin" />
-                                        <div className="flex-1 h-2 bg-white rounded-full overflow-hidden border border-amber-200 p-[1px] shadow-inner">
+                                    <div className="flex flex-col gap-1.5 bg-amber-50/80 px-3 py-2 rounded-xl border border-amber-300/50 min-w-[220px] shadow-sm backdrop-blur-sm">
+                                        <div className="flex items-center gap-2">
+                                            <RefreshCw className="w-3 h-3 text-amber-600 animate-spin" />
+                                            <span className="text-[9px] font-black text-amber-800 uppercase tracking-tighter animate-pulse whitespace-nowrap">
+                                                {installType === 'revert' ? 'Reverting' : installType === 'delete' ? 'Uninstalling' : isPending ? 'Installing' : 'Updating'} {installProgress}%
+                                            </span>
+                                            {throughput && (
+                                                <span className="ml-auto text-[8px] font-bold text-amber-600 font-mono">{throughput}</span>
+                                            )}
+                                        </div>
+                                        <div className="w-full h-1.5 bg-white/50 rounded-full overflow-hidden border border-amber-200/50 p-[1px]">
                                             <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${installProgress}%` }}
-                                                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                                                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
                                             />
                                         </div>
-                                        <span className="text-[8px] font-black text-amber-800 uppercase tracking-tighter animate-pulse whitespace-nowrap">
-                                            {installType === 'revert' ? 'Reverting...' : installType === 'delete' ? 'Uninstalling...' : 'Updating...'}
-                                        </span>
+                                        {lastLog && (
+                                            <span className="text-[7px] font-mono text-amber-700/70 truncate uppercase tracking-tighter">
+                                                {lastLog}
+                                            </span>
+                                        )}
                                     </div>
                                 ) : (
                                     <Button
                                         size="sm"
                                         onClick={handleUpdate}
-                                        className="h-7 px-2 bg-amber-400 hover:bg-amber-500 text-black text-[9px] font-black uppercase rounded-lg border border-amber-500/20 shadow-sm transition-all active:scale-95"
+                                        className={`h-7 px-2 ${isPending ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-amber-400 hover:bg-amber-500 text-black'} text-[9px] font-black uppercase rounded-lg border border-slate-500/10 shadow-sm transition-all active:scale-95`}
                                     >
-                                        <ArrowUp className="w-3 h-3 mr-1" /> Update
+                                        {isPending ? <Download className="w-3 h-3 mr-1" /> : <ArrowUp className="w-3 h-3 mr-1" />} 
+                                        {isPending ? 'Install' : 'Update'}
                                     </Button>
                                 )}
                             </div>
@@ -177,9 +193,11 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                         onCheckedChange={handleToggle}
                         className="h-5 w-5 border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 shadow-sm"
                     />
-                    <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-300 ${isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
-                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`} />
-                        <span className="text-[10px] font-black uppercase tracking-wider">{isActive ? 'Active' : 'Idle'}</span>
+                    <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-300 ${isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : isPending ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : isPending ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
+                        <span className="text-[10px] font-black uppercase tracking-wider">
+                            {isActive ? 'Active' : isPending ? 'Pending' : 'Idle'}
+                        </span>
                     </div>
                 </div>
 
@@ -242,24 +260,40 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     <motion.div 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="px-1 space-y-2"
+                        className="px-1 space-y-2.5"
                     >
                         <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shadow-sm border border-amber-200">
+                            <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center shadow-sm border border-amber-200">
                                 <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
                             </div>
-                            <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest animate-pulse">
-                                {installType === 'revert' ? 'Reverting' : installType === 'delete' ? 'Uninstalling' : 'Updating'}
-                            </span>
-                            <span className="ml-auto text-[10px] font-bold font-mono text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">{installProgress}%</span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest animate-pulse leading-none mb-1">
+                                    {installType === 'revert' ? 'Reverting' : installType === 'delete' ? 'Uninstalling' : isPending ? 'Installing' : 'Updating'}
+                                </span>
+                                {throughput && (
+                                    <span className="text-[8px] font-black font-mono text-amber-500 uppercase tracking-widest leading-none">{throughput}</span>
+                                )}
+                            </div>
+                            <span className="ml-auto text-[11px] font-black font-mono text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">{installProgress}%</span>
                         </div>
-                        <div className="w-full h-2.5 bg-amber-50 rounded-full overflow-hidden border border-amber-200 p-[1.5px] shadow-inner">
+                        <div className="w-full h-3 bg-amber-50 rounded-full overflow-hidden border border-amber-200 p-[2px] shadow-inner">
                             <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${installProgress}%` }}
-                                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.4)]"
+                                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)]"
                             />
                         </div>
+                        {lastLog && (
+                            <div className="bg-slate-900/90 backdrop-blur-md rounded-xl p-2.5 border border-slate-800 shadow-xl">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <Terminal className="w-2.5 h-2.5 text-cyan-400" />
+                                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Registry Feed</span>
+                                </div>
+                                <p className="text-[8px] font-mono text-slate-300 truncate leading-relaxed">
+                                    {lastLog}
+                                </p>
+                            </div>
+                        )}
                     </motion.div>
                 )}
 
@@ -276,15 +310,15 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                         <span className="text-[12px] font-bold font-mono text-slate-900 tabular-nums">{formatBytes(pkg.size)}</span>
                     </div>
 
-                    {hasUpdate && !isInstalling && (
+                    {(hasUpdate || isPending) && !isInstalling && (
                         <div className="flex-shrink-0">
                             <Button
                                 size="sm"
                                 onClick={handleUpdate}
-                                className="h-8 px-3 bg-amber-400 hover:bg-amber-500 text-black text-[10px] font-black uppercase rounded-xl shadow-lg shadow-amber-200/50 border border-amber-500/20 transition-all active:scale-95 group/up"
+                                className={`h-8 px-3 ${isPending ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200/50' : 'bg-amber-400 hover:bg-amber-500 text-black shadow-amber-200/50'} text-[10px] font-black uppercase rounded-xl shadow-lg border border-slate-500/10 transition-all active:scale-95 group/up`}
                             >
-                                <ArrowUp className="w-3.5 h-3.5 mr-1 group-hover/up:-translate-y-0.5 transition-transform" /> 
-                                Update
+                                {isPending ? <Download className="w-3.5 h-3.5 mr-1 group-hover/up:translate-y-0.5 transition-transform" /> : <ArrowUp className="w-3.5 h-3.5 mr-1 group-hover/up:-translate-y-0.5 transition-transform" />} 
+                                {isPending ? 'Install' : 'Update'}
                             </Button>
                         </div>
                     )}

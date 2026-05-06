@@ -1,13 +1,18 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dialog, DialogContent, DialogFooter } from './ui/dialog'
+import { Dialog, DialogContent } from './ui/dialog'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Switch } from './ui/switch'
 import { Badge } from './ui/badge'
 import { ScrollArea } from './ui/scroll-area'
-import { Settings, FolderPlus, Trash2, RefreshCw, CheckCircle, HardDrive, Download, ShieldCheck, History, Package, Zap, ArrowLeft, Terminal, Layout } from 'lucide-react'
+import {
+    Settings, FolderPlus, Trash2, RefreshCw, CheckCircle, HardDrive,
+    Download, ShieldCheck, History, Package, Zap, Terminal, Layout,
+    Cpu, Activity, Database, Globe, Lock, Share2, Filter, AlertTriangle,
+    Search, Gauge, Clock, FileText, ChevronRight
+} from 'lucide-react'
 import { isTauri } from '../lib/browserMock'
 import { useMaintenance } from '../hooks/useMaintenance'
 import { useHistory } from '../hooks/useHistory'
@@ -22,8 +27,6 @@ export function SettingsDialog({
     projects = [],
     showToast,
     formatBytes,
-    setCurrentProject,
-    setViewMode
 }) {
     const [localSettings, setLocalSettings] = useState(settings)
     const [checkingUpdates, setCheckingUpdates] = useState(false)
@@ -36,26 +39,28 @@ export function SettingsDialog({
         runMaintenance,
         handleCleanCache,
         handleCleanAllCaches
-    } = useMaintenance(projects, showToast || (() => {}))
+    } = useMaintenance(projects, showToast || (() => { }))
 
     const { historyRecords, clearHistory } = useHistory()
 
     React.useEffect(() => {
         if (isOpen) {
-            setLocalSettings(settings)
+            setLocalSettings({
+                ...settings,
+                performanceProfile: settings.performanceProfile || 'standard',
+                updateChannel: settings.updateChannel || 'stable',
+                logLevel: settings.logLevel || 'info',
+                deepSearch: settings.deepSearch ?? true,
+                autoCleanup: settings.autoCleanup ?? false,
+                cleanupDays: settings.cleanupDays || 30
+            })
             setUpdateStatus(null)
-            setActiveTab('general')
         }
     }, [isOpen, settings])
 
-    const handleManualUpdateCheck = () => {
-        setCheckingUpdates(true)
-        setUpdateStatus('checking')
-        setTimeout(() => {
-            setCheckingUpdates(false)
-            setUpdateStatus('latest')
-            if (onCheckUpdates) onCheckUpdates()
-        }, 2000)
+    const handleSave = () => {
+        onSave(localSettings)
+        onOpenChange(false)
     }
 
     const addCustomPath = async () => {
@@ -86,304 +91,453 @@ export function SettingsDialog({
         }))
     }
 
-    const handleSave = () => {
-        onSave(localSettings)
-        onOpenChange(false)
+    const sidebarItems = [
+        { id: 'general', label: 'Engine', icon: Cpu, color: 'text-purple-500' },
+        { id: 'updates', label: 'Deployment', icon: Globe, color: 'text-emerald-500' },
+        { id: 'maintenance', label: 'Health', icon: ShieldCheck, color: 'text-blue-500' },
+        { id: 'history', label: 'Ledger', icon: History, color: 'text-orange-500' },
+        { id: 'advanced', label: 'Terminal', icon: Terminal, color: 'text-slate-400' },
+    ]
+
+    const containerVariants = {
+        hidden: { opacity: 0, x: 20 },
+        visible: { opacity: 1, x: 0, transition: { staggerChildren: 0.05 } }
     }
 
-    const sidebarItems = [
-        { id: 'general', label: 'General', icon: Layout, color: 'text-purple-600' },
-        { id: 'updates', label: 'Updates', icon: RefreshCw, color: 'text-emerald-500' },
-        { id: 'maintenance', label: 'Maintenance', icon: ShieldCheck, color: 'text-blue-500' },
-        { id: 'history', label: 'History', icon: History, color: 'text-orange-500' },
-    ]
+    const cardVariants = {
+        hidden: { opacity: 0, y: 10 },
+        visible: { opacity: 1, y: 0 }
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-6xl w-full bg-white/95 backdrop-blur-2xl border border-white shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] rounded-[2.5rem] p-0 overflow-hidden">
-                <div className="flex h-[75vh] w-full">
-                    {/* Sidebar */}
-                    <div className="w-64 bg-gray-50/50 border-r border-gray-100/50 p-8 flex flex-col">
-                        <div className="flex items-center gap-3 mb-10">
-                            <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200">
-                                <Settings className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="font-black text-xl tracking-tight">Settings</span>
-                        </div>
+            <DialogContent className="max-w-[1100px] w-full bg-white border-0 shadow-[0_80px_120px_-20px_rgba(0,0,0,0.25)] rounded-[3rem] p-0 overflow-hidden flex h-[80vh]">
 
-                        <div className="space-y-1.5 flex-1">
-                            {sidebarItems.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setActiveTab(item.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                                        activeTab === item.id
-                                            ? 'bg-white shadow-sm text-gray-900 border border-gray-100/50'
-                                            : 'text-gray-400 hover:text-gray-600 hover:bg-white/40'
-                                    }`}
-                                >
-                                    <item.icon className={`w-4 h-4 ${activeTab === item.id ? item.color : ''}`} />
-                                    <span className="font-black text-[12px] uppercase tracking-widest">{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                {/* Tactical Dock (Sidebar) */}
+                <div className="w-[280px] bg-slate-50/80 border-r border-slate-100 p-10 flex flex-col relative">
+                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-purple-500/5 to-transparent pointer-events-none" />
 
-                        <div className="mt-auto pt-8 border-t border-gray-100/50">
-                            <div className="flex items-center gap-2 px-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Engine v0.5.0</span>
-                            </div>
+                    <div className="flex items-center gap-4 mb-14 relative z-10">
+                        <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-2xl shadow-purple-500/20">
+                            <Settings className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black text-slate-900 leading-none mb-1">Command</h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">v0.5.0-STABLE</p>
                         </div>
                     </div>
 
-                    {/* Content Area */}
-                    <div className="flex-1 p-10 overflow-y-auto">
-                        <AnimatePresence mode="wait">
-                            {activeTab === 'general' && (
-                                <motion.div key="general" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-12">
-                                    <section>
-                                        <div className="flex items-center justify-between mb-8">
-                                            <div>
-                                                <h3 className="text-2xl font-black text-gray-900 tracking-tight">Monitor Paths</h3>
-                                                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">Directory Scan Scope</p>
-                                            </div>
-                                            <Button onClick={addCustomPath} className="h-10 bg-gray-900 text-white rounded-xl px-6 font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all">
-                                                <FolderPlus className="w-4 h-4 mr-2" /> Add Workspace
-                                            </Button>
-                                        </div>
+                    <div className="space-y-2 relative z-10">
+                        {sidebarItems.map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={`w-full group flex items-center justify-between px-5 py-4 rounded-2xl transition-all duration-300 ${activeTab === item.id
+                                        ? 'bg-white shadow-xl shadow-slate-200/50 text-slate-900 border border-white'
+                                        : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <item.icon className={`w-5 h-5 transition-colors ${activeTab === item.id ? item.color : 'text-slate-300'}`} />
+                                    <span className="font-black text-[11px] uppercase tracking-[0.15em]">{item.label}</span>
+                                </div>
+                                {activeTab === item.id && <motion.div layoutId="dock-dot" className="w-1.5 h-1.5 rounded-full bg-slate-900" />}
+                            </button>
+                        ))}
+                    </div>
 
-                                        <div className="bg-gray-100/30 rounded-2xl border border-gray-100 overflow-hidden min-h-[200px]">
-                                            {(localSettings.customScanPaths || []).length === 0 ? (
-                                                <div className="h-full flex flex-col items-center justify-center py-16 text-gray-400">
-                                                    <Layout className="w-12 h-12 mb-4 opacity-10" />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest">No Custom Workspaces</span>
-                                                </div>
-                                            ) : (
-                                                <ScrollArea className="h-[300px]">
-                                                    <div className="divide-y divide-gray-100/50">
-                                                        {localSettings.customScanPaths.map((path, i) => (
-                                                            <div key={i} className="flex items-center justify-between p-4 hover:bg-white/50 transition-colors group">
-                                                                <div className="flex items-center gap-3 min-w-0">
-                                                                    <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-gray-400">
-                                                                        <HardDrive className="w-4 h-4" />
-                                                                    </div>
-                                                                    <span className="text-xs font-bold text-gray-600 truncate max-w-md">{path}</span>
-                                                                </div>
-                                                                <button onClick={() => removePath(path)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center">
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </ScrollArea>
-                                            )}
-                                        </div>
-                                    </section>
-
-                                    <section>
-                                        <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-8">System Limits</h3>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="bg-white/50 p-8 rounded-2xl border border-gray-100 shadow-sm">
-                                                <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">
-                                                    Cache Threshold Alert
-                                                </Label>
-                                                <div className="flex items-center gap-4">
-                                                    <Input
-                                                        type="number"
-                                                        value={localSettings.globalSizeThreshold || 2}
-                                                        onChange={(e) => setLocalSettings(prev => ({ ...prev, globalSizeThreshold: parseFloat(e.target.value) }))}
-                                                        className="w-24 font-black h-12 text-xl bg-white border-gray-100 rounded-xl px-4"
-                                                    />
-                                                    <span className="text-lg font-black text-gray-900">GB</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </section>
-                                </motion.div>
-                            )}
-
-                            {activeTab === 'updates' && (
-                                <motion.div key="updates" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-8">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <div>
-                                            <h3 className="text-2xl font-black text-gray-900 tracking-tight">Software Delivery</h3>
-                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">Platform Integrity v0.5.0</p>
-                                        </div>
-                                        <Badge className="bg-emerald-50 text-emerald-600 border border-emerald-100/50 px-4 py-1.5 rounded-xl font-black uppercase text-[10px] tracking-widest">Stable Release</Badge>
-                                    </div>
-
-                                    <div className="bg-white/50 rounded-2xl border border-gray-100 p-6 flex items-center justify-between shadow-sm">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm">
-                                                <RefreshCw className="w-6 h-6" />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-black text-gray-900 text-sm">Background Analysis</h4>
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Auto-check framework updates</p>
-                                            </div>
-                                        </div>
-                                        <Switch
-                                            checked={localSettings.autoCheckUpdates || false}
-                                            onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, autoCheckUpdates: checked }))}
-                                        />
-                                    </div>
-
-                                    <div className="bg-gray-900 rounded-[2rem] p-10 text-white relative overflow-hidden shadow-2xl">
-                                        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-[100px] -mr-32 -mt-32" />
-                                        <div className="relative z-10">
-                                            <h4 className="text-3xl font-black tracking-tight mb-2">Check for PEEAK Updates</h4>
-                                            <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-8">Ensure you have the latest dependency intelligence</p>
-                                            <Button
-                                                onClick={handleManualUpdateCheck}
-                                                disabled={checkingUpdates}
-                                                className="bg-white text-gray-900 hover:bg-gray-100 h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-black/20"
-                                            >
-                                                {checkingUpdates ? <RefreshCw className="w-4 h-4 mr-3 animate-spin" /> : updateStatus === 'latest' ? <CheckCircle className="w-4 h-4 mr-3 text-emerald-600" /> : <Download className="w-4 h-4 mr-3" />}
-                                                {checkingUpdates ? 'Connecting...' : updateStatus === 'latest' ? 'Up to Date' : 'Sync Engine'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {activeTab === 'maintenance' && (
-                                <motion.div key="maintenance" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-8">
-                                     <div className="flex items-center justify-between mb-8">
-                                        <div>
-                                            <h3 className="text-2xl font-black text-gray-900 tracking-tight text-blue-600">Smart Maintenance</h3>
-                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">Optimization Engine</p>
-                                        </div>
-                                        <Button
-                                            onClick={runMaintenance}
-                                            disabled={isAnalyzing}
-                                            className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-200 no-hover"
-                                        >
-                                            {isAnalyzing ? (
-                                                <><RefreshCw className="w-4 h-4 mr-3 animate-spin" /> Analyzing...</>
-                                            ) : (
-                                                <><ShieldCheck className="w-4 h-4 mr-3" /> Execute Health Check</>
-                                            )}
-                                        </Button>
-                                    </div>
-
-                                    {!maintenanceResult ? (
-                                        <div className="text-center py-20 bg-gray-50/50 rounded-[2.5rem] border border-gray-100 flex flex-col items-center">
-                                            <div className="w-20 h-20 bg-white rounded-2xl shadow-md flex items-center justify-center mb-6 text-blue-200">
-                                                <Zap className="w-10 h-10" />
-                                            </div>
-                                            <h4 className="text-xl font-black text-gray-900 mb-2">Diagnostic Engine Ready</h4>
-                                            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest max-w-xs mx-auto">Identify bloated caches and unused dependencies across your workspaces</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                {[
-                                                    { label: 'Cache Storage', value: maintenanceResult.caches.reduce((s, c) => s + c.size, 0) / (1024 * 1024), unit: 'MB', color: 'text-blue-600' },
-                                                    { label: 'Dead Deps', value: maintenanceResult.unused_packages.length, unit: 'Items', color: 'text-pink-600' },
-                                                    { label: 'Actionable', value: maintenanceResult.caches.length, unit: 'Tasks', color: 'text-emerald-600' }
-                                                ].map((stat, i) => (
-                                                    <div key={i} className="bg-white/80 p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-                                                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">{stat.label}</p>
-                                                        <div className={`text-3xl font-black ${stat.color} tracking-tighter`}>
-                                                            <AnimatedCounter value={stat.value} />
-                                                            <span className="text-xs ml-1 uppercase font-bold">{stat.unit}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            <div className="space-y-4 pt-4">
-                                                <div className="flex items-center justify-between px-2">
-                                                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                                                        <HardDrive className="w-4 h-4 text-blue-500" /> System Caches
-                                                    </h4>
-                                                    <button onClick={handleCleanAllCaches} className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline">Purge All</button>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {maintenanceResult.caches.map((cache, i) => (
-                                                        <div key={i} className="bg-white/80 rounded-2xl p-4 border border-gray-100 flex items-center justify-between group hover:border-blue-100 transition-all">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                                                                    <Package className="w-5 h-5" />
-                                                                </div>
-                                                                <div>
-                                                                    <h5 className="font-black text-gray-900 text-sm leading-none mb-1">{cache.name}</h5>
-                                                                    <span className="text-[10px] text-blue-500 font-black uppercase tracking-widest leading-none">{formatBytes(cache.size)}</span>
-                                                                </div>
-                                                            </div>
-                                                            <button onClick={() => handleCleanCache(cache.path)} className="w-9 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center">
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-                                </motion.div>
-                            )}
-
-                            {activeTab === 'history' && (
-                                <motion.div key="history" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-8">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <div>
-                                            <h3 className="text-2xl font-black text-gray-900 tracking-tight text-orange-500">Audit History</h3>
-                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">Timeline of System Changes</p>
-                                        </div>
-                                        <button onClick={clearHistory} disabled={historyRecords.length === 0} className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors">Clear Ledger</button>
-                                    </div>
-
-                                    <div className="bg-gray-100/30 rounded-2xl border border-gray-100 overflow-hidden">
-                                        {historyRecords.length === 0 ? (
-                                            <div className="py-24 text-center">
-                                                <History className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-                                                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No audit trails recorded</p>
-                                            </div>
-                                        ) : (
-                                            <ScrollArea className="h-[450px]">
-                                                <div className="p-2 space-y-2">
-                                                    {historyRecords.map((record) => (
-                                                        <div key={record.id} className="bg-white/80 rounded-xl p-4 border border-gray-50 flex items-center gap-4 hover:shadow-sm transition-all group">
-                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                                                record.type === 'install' ? 'bg-blue-50 text-blue-600' :
-                                                                record.type === 'update' ? 'bg-emerald-50 text-emerald-600' :
-                                                                record.type === 'maintenance' ? 'bg-purple-50 text-purple-600' :
-                                                                'bg-orange-50 text-orange-600'
-                                                            }`}>
-                                                                {record.type === 'install' && <Package className="w-5 h-5" />}
-                                                                {record.type === 'update' && <RefreshCw className="w-5 h-5" />}
-                                                                {record.type === 'maintenance' && <Terminal className="w-5 h-5" />}
-                                                                {!['install', 'update', 'maintenance'].includes(record.type) && <History className="w-5 h-5" />}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 mb-0.5">
-                                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                                                                        {new Date(record.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
-                                                                    </span>
-                                                                    <div className={`w-1.5 h-1.5 rounded-full ${record.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                                                                </div>
-                                                                <h5 className="font-black text-gray-900 text-sm tracking-tight truncate leading-none mb-1">{record.title}</h5>
-                                                                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wide truncate">{record.description}</p>
-                                                            </div>
-                                                            <Badge className="bg-gray-50 text-gray-400 border-0 font-black text-[8px] uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">{record.projectName || 'SYSTEM'}</Badge>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                    <div className="mt-auto pt-8 border-t border-slate-200/50 relative z-10">
+                        <div className="bg-white/50 p-4 rounded-2xl border border-white flex items-center gap-3">
+                            <div className="relative">
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping absolute inset-0 opacity-40" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 relative" />
+                            </div>
+                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Engine Active</span>
+                        </div>
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 bg-white border-t border-gray-100 flex justify-end gap-3 rounded-b-[2.5rem]">
-                    <button onClick={() => onOpenChange(false)} className="px-6 h-11 rounded-xl text-gray-400 font-black text-[11px] uppercase tracking-widest hover:text-gray-900 transition-colors">Cancel</button>
-                    <Button onClick={handleSave} className="bg-purple-600 hover:bg-purple-700 text-white h-11 px-8 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-purple-200 active:scale-95 transition-all">
-                        Commit Changes
+                {/* Tactical Workspace (Content) */}
+                <div className="flex-1 bg-white p-14 overflow-y-auto relative scrollbar-hide">
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'general' && (
+                            <motion.div key="general" variants={containerVariants} initial="hidden" animate="visible" exit="hidden" className="space-y-12">
+                                <section>
+                                    <div className="flex items-center justify-between mb-8">
+                                        <div>
+                                            <h3 className="text-3xl font-black text-slate-900 tracking-tight">Engine Identity</h3>
+                                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Global Core Configuration</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {[
+                                                { id: 'stealth', icon: Lock, label: 'Stealth' },
+                                                { id: 'standard', icon: Layout, label: 'Standard' },
+                                                { id: 'turbo', icon: Zap, label: 'Turbo' }
+                                            ].map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => setLocalSettings(prev => ({ ...prev, performanceProfile: p.id }))}
+                                                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${localSettings.performanceProfile === p.id
+                                                            ? 'bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-200'
+                                                            : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'
+                                                        }`}
+                                                >
+                                                    {p.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 hover:border-purple-200 transition-all group">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                                                    <Activity className="w-5 h-5" />
+                                                </div>
+                                                <Switch
+                                                    checked={localSettings.autoScan || false}
+                                                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, autoScan: checked }))}
+                                                />
+                                            </div>
+                                            <h4 className="font-black text-slate-900 text-sm mb-1 uppercase tracking-tight">Active Indexing</h4>
+                                            <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">Monitor workspaces for delta changes in real-time</p>
+                                        </div>
+
+                                        <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 hover:border-emerald-200 transition-all group">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                                    <Database className="w-5 h-5" />
+                                                </div>
+                                                <Switch
+                                                    checked={localSettings.deepSearch || false}
+                                                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, deepSearch: checked }))}
+                                                />
+                                            </div>
+                                            <h4 className="font-black text-slate-900 text-sm mb-1 uppercase tracking-tight">Deep Inspection</h4>
+                                            <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">Recursive analysis of nested sub-dependencies</p>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Workspace Protocol</h3>
+                                        <Button onClick={addCustomPath} className="bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-6 rounded-xl font-black text-[9px] uppercase tracking-[0.2em] transition-all">
+                                            <FolderPlus className="w-4 h-4 mr-2" /> Add Repository
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {(localSettings.customScanPaths || []).length === 0 ? (
+                                            <div className="py-12 border-2 border-dashed border-slate-100 rounded-[2rem] flex flex-col items-center text-slate-300">
+                                                <Search className="w-10 h-10 mb-3 opacity-20" />
+                                                <span className="text-[9px] font-black uppercase tracking-[0.3em]">No Active Workspaces Found</span>
+                                            </div>
+                                        ) : (
+                                            localSettings.customScanPaths.map((path, i) => (
+                                                <div key={i} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl hover:shadow-xl hover:shadow-slate-200/30 transition-all group">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all">
+                                                            <HardDrive className="w-5 h-5" />
+                                                        </div>
+                                                        <span className="text-[11px] font-bold text-slate-600 font-mono">{path}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => removePath(path)}
+                                                        className="w-8 h-8 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </section>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'updates' && (
+                            <motion.div key="updates" variants={containerVariants} initial="hidden" animate="visible" exit="hidden" className="space-y-10">
+                                <section>
+                                    <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Sync Intelligence</h3>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-10">Global Registry Synchronization</p>
+
+                                    <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-purple-500/20">
+                                        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-[100px] -mr-40 -mt-40 animate-pulse" />
+                                        <div className="relative z-10 flex justify-between items-start">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest text-purple-300">
+                                                        Current: v0.5.0
+                                                    </div>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                </div>
+                                                <h4 className="text-4xl font-black tracking-tight mb-4">Latest Protocol Active</h4>
+                                                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest max-w-sm leading-relaxed">System integrity verified. No pending updates found in the stable channel.</p>
+                                            </div>
+                                            <Button
+                                                onClick={() => {
+                                                    setCheckingUpdates(true)
+                                                    setUpdateStatus('checking')
+                                                    setTimeout(() => {
+                                                        setCheckingUpdates(false)
+                                                        setUpdateStatus('latest')
+                                                        if (onCheckUpdates) onCheckUpdates()
+                                                    }, 2000)
+                                                }}
+                                                disabled={checkingUpdates}
+                                                className="bg-white text-slate-900 hover:bg-purple-50 h-14 px-10 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                                            >
+                                                {checkingUpdates ? <RefreshCw className="w-4 h-4 mr-3 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-3" />}
+                                                {checkingUpdates ? 'Syncing...' : 'Sync Now'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2rem]">
+                                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Update Channel</h5>
+                                        <div className="space-y-2">
+                                            {[
+                                                { id: 'stable', label: 'Stable', desc: 'Verified Production Builds' },
+                                                { id: 'beta', label: 'Beta', desc: 'Pre-release Feature Testing' },
+                                                { id: 'canary', label: 'Canary', desc: 'Nightly Unstable Protocols' }
+                                            ].map(ch => (
+                                                <button
+                                                    key={ch.id}
+                                                    onClick={() => setLocalSettings(prev => ({ ...prev, updateChannel: ch.id }))}
+                                                    className={`w-full text-left p-4 rounded-xl border transition-all ${localSettings.updateChannel === ch.id
+                                                            ? 'bg-white border-purple-200 shadow-sm'
+                                                            : 'border-transparent hover:bg-white/50'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className={`text-[11px] font-black uppercase tracking-widest ${localSettings.updateChannel === ch.id ? 'text-purple-600' : 'text-slate-600'}`}>{ch.label}</span>
+                                                        {localSettings.updateChannel === ch.id && <CheckCircle className="w-3.5 h-3.5 text-purple-600" />}
+                                                    </div>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{ch.desc}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-4">
+                                        <div className="p-8 bg-white border border-slate-100 rounded-[2rem] flex-1 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Globe className="w-4 h-4 text-emerald-500" />
+                                                    <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Global Relay</h5>
+                                                </div>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Automatically fetch registry metadata in the background every 60 minutes.</p>
+                                            </div>
+                                            <Switch
+                                                checked={localSettings.autoCheckUpdates || false}
+                                                onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, autoCheckUpdates: checked }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'maintenance' && (
+                            <motion.div key="maintenance" variants={containerVariants} initial="hidden" animate="visible" exit="hidden" className="space-y-8">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div>
+                                        <h3 className="text-3xl font-black text-slate-900 tracking-tight">Health Guard</h3>
+                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Autonomous Optimization Engine</p>
+                                    </div>
+                                    <Button
+                                        onClick={runMaintenance}
+                                        disabled={isAnalyzing}
+                                        className="h-14 px-10 bg-slate-900 hover:bg-black text-white rounded-[1.25rem] font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-slate-200 transition-all hover:scale-105 active:scale-95"
+                                    >
+                                        {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-3 text-emerald-400" />}
+                                        {isAnalyzing ? 'Analyzing System...' : 'Initiate Full Audit'}
+                                    </Button>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4 mb-8">
+                                    {[
+                                        { id: 'cleanup', icon: Trash2, label: 'Auto-Cleanup', color: 'text-red-500', bg: 'bg-red-50', state: localSettings.autoCleanup },
+                                        { id: 'notify', icon: AlertTriangle, label: 'Disk Alerts', color: 'text-amber-500', bg: 'bg-amber-50', state: true },
+                                        { id: 'logs', icon: FileText, label: 'Debug Mode', color: 'text-blue-500', bg: 'bg-blue-50', state: false }
+                                    ].map(rule => (
+                                        <div key={rule.id} className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className={`w-10 h-10 ${rule.bg} rounded-xl flex items-center justify-center ${rule.color}`}>
+                                                    <rule.icon className="w-5 h-5" />
+                                                </div>
+                                                <Switch checked={rule.state} onCheckedChange={(val) => {
+                                                    if (rule.id === 'cleanup') setLocalSettings(prev => ({ ...prev, autoCleanup: val }))
+                                                }} />
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{rule.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {maintenanceResult ? (
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                        <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm">
+                                            <div className="flex items-center justify-between mb-8">
+                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-3">
+                                                    <Gauge className="w-4 h-4 text-purple-600" /> Storage Consumption
+                                                </h4>
+                                                <Badge className="bg-slate-900 text-white rounded-lg px-3 py-1 font-mono text-[10px]">
+                                                    {formatBytes(maintenanceResult.caches.reduce((s, c) => s + c.size, 0))} Total Bloat
+                                                </Badge>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {maintenanceResult.caches.map((cache, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-5 bg-slate-50/50 rounded-2xl border border-transparent hover:border-slate-100 transition-all group">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400 group-hover:text-purple-600 transition-colors">
+                                                                <Package className="w-5 h-5" />
+                                                            </div>
+                                                            <div>
+                                                                <h5 className="text-[11px] font-black text-slate-900 uppercase tracking-wider leading-none mb-1">{cache.name}</h5>
+                                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{formatBytes(cache.size)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <button onClick={() => handleCleanCache(cache.path)} className="px-5 py-2 bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest border border-slate-100 transition-all">Purge</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ) : (
+                                    <div className="py-24 border-2 border-dashed border-slate-100 rounded-[3rem] flex flex-col items-center justify-center text-slate-300">
+                                        <Activity className="w-16 h-16 mb-4 opacity-10" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.3em]">No Audit Data Available</p>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'history' && (
+                            <motion.div key="history" variants={containerVariants} initial="hidden" animate="visible" exit="hidden" className="space-y-8">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div>
+                                        <h3 className="text-3xl font-black text-slate-900 tracking-tight">Audit Ledger</h3>
+                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Timeline of Authorized Changes</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button onClick={() => { }} className="text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all">Export JSON</button>
+                                        <button onClick={clearHistory} className="px-6 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">Wipe History</button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {historyRecords.length === 0 ? (
+                                        <div className="py-32 flex flex-col items-center justify-center text-slate-200">
+                                            <Clock className="w-20 h-20 mb-4 opacity-10" />
+                                            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Historical Ledger Empty</p>
+                                        </div>
+                                    ) : (
+                                        <ScrollArea className="h-[500px] pr-4">
+                                            {historyRecords.map((record) => {
+                                                const Icon = record.type === 'install' ? Package :
+                                                    record.type === 'update' ? RefreshCw : ShieldCheck;
+
+                                                return (
+                                                    <div key={record.id} className="mb-3 bg-white border border-slate-100 rounded-3xl p-6 flex items-center gap-6 hover:shadow-2xl hover:shadow-slate-200/50 transition-all border-l-4 border-l-slate-900">
+                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${record.type === 'install' ? 'bg-blue-50 text-blue-600' :
+                                                                record.type === 'update' ? 'bg-emerald-50 text-emerald-600' :
+                                                                    'bg-purple-50 text-purple-600'
+                                                            }`}>
+                                                            <Icon className="w-6 h-6" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-3 mb-1">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{new Date(record.timestamp).toLocaleString()}</span>
+                                                                <div className={`w-1.5 h-1.5 rounded-full ${record.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                            </div>
+                                                            <h5 className="font-black text-slate-900 text-sm tracking-tight mb-1">{record.title}</h5>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{record.description}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <Badge className="bg-slate-50 text-slate-400 border-0 font-black text-[8px] uppercase tracking-tighter">{record.projectName || 'SYSTEM'}</Badge>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </ScrollArea>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'advanced' && (
+                            <motion.div key="advanced" variants={containerVariants} initial="hidden" animate="visible" exit="hidden" className="space-y-10">
+                                <section>
+                                    <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Advanced Protocols</h3>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-10">System Level Overrides</p>
+
+                                    <div className="space-y-6">
+                                        <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <Terminal className="w-6 h-6 text-purple-400" />
+                                                <h5 className="text-lg font-black uppercase tracking-widest">Debug Verbosity</h5>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {['error', 'info', 'debug'].map(lvl => (
+                                                    <button
+                                                        key={lvl}
+                                                        onClick={() => setLocalSettings(prev => ({ ...prev, logLevel: lvl }))}
+                                                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${localSettings.logLevel === lvl
+                                                                ? 'bg-purple-500 text-white border-purple-500 shadow-xl shadow-purple-500/20'
+                                                                : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10'
+                                                            }`}
+                                                    >
+                                                        {lvl}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2rem] flex flex-col justify-between h-48">
+                                                <div>
+                                                    <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                        <Share2 className="w-4 h-4 text-blue-500" /> Analytics Relay
+                                                    </h5>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Share anonymized diagnostic data to improve engine precision.</p>
+                                                </div>
+                                                <Switch checked={true} />
+                                            </div>
+                                            <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2rem] flex flex-col justify-between h-48">
+                                                <div>
+                                                    <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                        <Filter className="w-4 h-4 text-orange-500" /> Cache Compression
+                                                    </h5>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Enable GZIP compression for localized metadata storage.</p>
+                                                </div>
+                                                <Switch checked={true} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Tactical Footer */}
+                <div className="absolute bottom-10 right-10 flex gap-4">
+                    <button
+                        onClick={() => onOpenChange(false)}
+                        className="px-8 h-14 rounded-2xl text-slate-400 font-black text-[11px] uppercase tracking-[0.2em] hover:text-slate-900 transition-all"
+                    >
+                        Abort
+                    </button>
+                    <Button
+                        onClick={handleSave}
+                        className="bg-purple-600 hover:bg-purple-700 text-white h-14 px-12 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-purple-200 active:scale-95 transition-all flex items-center gap-3"
+                    >
+                        <CheckCircle className="w-4 h-4" /> Commit Configuration
                     </Button>
-                </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     )

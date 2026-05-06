@@ -47,7 +47,7 @@ import storybookIcon from './storybook.png'
 import zodIcon from './zod.png'
 import socketioIcon from './socket-io.png'
 import chartjsIcon from './chart-js.png'
-import d3Icon from './d3.png'
+import d3Icon from './D3.js.png'
 import threeIcon from './threejs.png'
 import shadcnuiIcon from './shadcn-ui.png'
 import chakrauiIcon from './chakra-ui.png'
@@ -117,6 +117,12 @@ import sanityIcon from './sanity.png'
 import discordIcon from './discord.webp'
 import slackIcon from './slack.png'
 import nodejsIcon from './Node.js.png'
+import nativewindIcon from './nativewind.jpeg'
+import wscatIcon from './wscat.png'
+import openclawIcon from './openclaw.png'
+import pandasIcon from './Pandas.png'
+import bunIcon from './bun.png'
+import yarnIcon from './Yarn.png'
 
 export const techIcons = {
     // Core Frameworks
@@ -147,6 +153,8 @@ export const techIcons = {
     'cargo': { name: 'Cargo', color: 'bg-orange-500', icon: '🦀', textColor: 'text-white', image: cargoIcon },
     'composer': { name: 'Composer', color: 'bg-purple-500', icon: '🎼', textColor: 'text-white', image: composerIcon },
     'pip': { name: 'pip', color: 'bg-blue-500', icon: '🐍', textColor: 'text-white', image: pipIcon },
+    'bun': { name: 'Bun', color: 'bg-black', icon: 'B', textColor: 'text-white', image: bunIcon },
+    'yarn': { name: 'Yarn', color: 'bg-blue-500', icon: 'Y', textColor: 'text-white', image: yarnIcon },
     'babel': { name: 'Babel', color: 'bg-yellow-500', icon: 'B', textColor: 'text-black', image: babelIcon },
     'rollup': { name: 'Rollup', color: 'bg-red-600', icon: 'R', textColor: 'text-white', image: rollupIcon },
     'esbuild': { name: 'esbuild', color: 'bg-yellow-500', icon: 'E', textColor: 'text-black', image: esbuildIcon },
@@ -159,6 +167,7 @@ export const techIcons = {
     'postcss': { name: 'PostCSS', color: 'bg-blue-500', icon: 'P', textColor: 'text-white', image: postcssIcon },
     'autoprefixer': { name: 'Autoprefixer', color: 'bg-pink-500', icon: 'A', textColor: 'text-white', image: autoprefixerIcon },
     'styled-components': { name: 'Styled Components', color: 'bg-pink-500', icon: '💅', textColor: 'text-white', image: styledcomponentsIcon },
+    'nativewind': { name: 'NativeWind', color: 'bg-white', icon: 'NW', textColor: 'text-blue-500', image: nativewindIcon },
 
     // UI Libraries
     'shadcn-ui': { name: 'shadcn/ui', color: 'bg-black', icon: 'UI', textColor: 'text-white', image: shadcnuiIcon },
@@ -264,6 +273,9 @@ export const techIcons = {
     'vitest': { name: 'Vitest', color: 'bg-green-500', icon: 'V', textColor: 'text-white', image: vitestIcon },
     'discord': { name: 'Discord', color: 'bg-indigo-500', icon: 'D', textColor: 'text-white', image: discordIcon },
     'slack': { name: 'Slack', color: 'bg-purple-500', icon: 'S', textColor: 'text-white', image: slackIcon },
+    'wscat': { name: 'WSCat', color: 'bg-black', icon: 'W', textColor: 'text-white', image: wscatIcon },
+    'openclaw': { name: 'OpenClaw', color: 'bg-black', icon: 'O', textColor: 'text-white', image: openclawIcon },
+    'pandas': { name: 'Pandas', color: 'bg-blue-900', icon: 'P', textColor: 'text-white', image: pandasIcon },
 }
 
 // Brand matching cache to avoid redundant calculations across hundreds of cards
@@ -299,7 +311,7 @@ export const getBestIcon = (name) => {
         // 2. Try keyword/prefix match for known brands (firebase, radix, three, etc.)
         const brands = Object.keys(techIcons).sort((a, b) => b.length - a.length);
         const foundBrand = brands.find(brand => {
-            if (brand.length < 3) return false;
+            if (brand.length < 2) return false;
             return lowerName.includes(brand) || normalized.includes(brand);
         });
 

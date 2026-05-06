@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react'
+import { Toaster } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FolderOpen, Layers, Square, Menu, Zap, Box } from 'lucide-react'
 import { gsap } from 'gsap'
@@ -312,6 +313,7 @@ const DashboardView = ({
           </div>
         )}
       </div>
+      <Toaster position="bottom-right" richColors theme="dark" />
     </div>
   )
 }

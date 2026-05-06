@@ -1,4 +1,5 @@
 import React, { useRef, useMemo, useCallback, useEffect } from 'react'
+import { Toaster } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, RefreshCw, HardDrive, ShieldCheck, Zap, FolderOpen, FolderMinus,
@@ -100,6 +101,7 @@ const ProjectDetailsView = React.memo(({
     handleDelete,
     openFolder,
     handleUpdateAll,
+    syncProject,
     handleUpdateSelected,
     handleDeleteSelected,
     togglePackage,
@@ -148,6 +150,7 @@ const ProjectDetailsView = React.memo(({
   const [displayMetrics, setDisplayMetrics] = React.useState({
     pkgCount: 0,
     outdatedCount: 0,
+    pendingCount: 0,
     totalSize: 0,
     criticalCount: 0,
     highCount: 0,
@@ -155,6 +158,21 @@ const ProjectDetailsView = React.memo(({
   });
 
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [packageToDelete, setPackageToDelete] = React.useState(null);
+
+  const handleDeleteClick = useCallback((pkg) => {
+    setPackageToDelete(pkg);
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const confirmDelete = () => {
+    if (packageToDelete) {
+      handleDelete(packageToDelete);
+      setShowDeleteConfirm(false);
+      setPackageToDelete(null);
+    }
+  };
 
   const confirmBulkDelete = () => {
     setShowBulkDeleteConfirm(false);
@@ -167,6 +185,7 @@ const ProjectDetailsView = React.memo(({
         setDisplayMetrics({
           pkgCount: scanResult?.packages?.length || 0,
           outdatedCount: outdatedCount || 0,
+          pendingCount: scanResult?.packages?.filter(p => p.is_declared && !p.is_installed).length || 0,
           totalSize: scanResult?.total_size || 0,
           criticalCount: auditResult?.metadata?.vulnerabilities?.critical || 0,
           highCount: auditResult?.metadata?.vulnerabilities?.high || 0,
@@ -178,6 +197,7 @@ const ProjectDetailsView = React.memo(({
       setDisplayMetrics({
         pkgCount: 0,
         outdatedCount: 0,
+        pendingCount: 0,
         totalSize: 0,
         criticalCount: 0,
         highCount: 0,
@@ -221,6 +241,22 @@ const ProjectDetailsView = React.memo(({
     }
   }, [autoUpdate, availableUpdates, auditResult, busy, handleUpdateAll, handleAuditFix]);
 
+
+  const projectType = useMemo(() => {
+    const manager = scanResult?.packages?.[0]?.manager;
+    if (manager === 'pip') return 'python';
+    if (manager === 'composer') return 'php';
+    if (manager === 'flutter') return 'flutter';
+    if (manager === 'cargo') return 'rust';
+    if (manager === 'npm' || manager === 'yarn' || manager === 'pnpm' || manager === 'bun') return 'node';
+
+    // Fallback detection via files
+    if (currentProject?.path) {
+      const path = currentProject.path.toLowerCase();
+      if (path.includes('node_modules') || path.includes('package.json')) return 'node';
+    }
+    return 'node'; // Default
+  }, [scanResult, currentProject]);
 
   const handleUninstall = useCallback(() => {
     if (confirmDeleteText === `delete - ${currentProject?.name}`) {
@@ -526,12 +562,19 @@ const ProjectDetailsView = React.memo(({
           {/* Row 1 Metric Cards */}
           <div className="xl:col-span-2 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-indigo-200 transition-all relative border-l-[2px] border-l-indigo-500/30 hover:border-l-indigo-500">
             <div className="space-y-1.5">
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
-              >
-                <Box className="w-5 h-5" />
-              </motion.div>
+              <div className="flex items-center justify-between">
+                <motion.div
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
+                >
+                  <Box className="w-5 h-5" />
+                </motion.div>
+                {displayMetrics.pendingCount > 0 && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 animate-pulse font-black text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-lg">
+                    {displayMetrics.pendingCount} Pending
+                  </Badge>
+                )}
+              </div>
               <span className="text-slate-400 font-black uppercase text-[9px] tracking-widest block">Packages</span>
             </div>
             <div className="mt-2">
@@ -624,15 +667,17 @@ const ProjectDetailsView = React.memo(({
           <div className="xl:col-span-6 bg-indigo-50/60 rounded-[2rem] p-5 border border-indigo-100 shadow-[inset_0_2px_8px_rgba(99,102,241,0.08)] flex flex-col justify-between group hover:bg-indigo-50 transition-all h-[150px]">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <span className="text-indigo-400 font-black uppercase text-[9px] tracking-widest">Environment Root</span>
-                {venvPath || (scanResult?.packages?.some(p => p.path?.includes(currentProject?.path)) ?? false) ? (
+                <span className="text-indigo-400 font-black uppercase text-[9px] tracking-widest">
+                  {projectType === 'python' ? 'Environment Root' : projectType === 'node' ? 'Node Modules' : 'Local Environment'}
+                </span>
+                {(venvPath || (scanResult?.packages?.some(p => p.is_installed && p.path?.includes(currentProject?.path)) ?? false)) ? (
                   <Badge className="bg-emerald-50 text-emerald-600 border border-emerald-200 font-black text-[9px] rounded-lg px-2.5 py-1 shadow-sm uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all cursor-default">Isolated</Badge>
                 ) : (
                   <Badge className="bg-amber-50 text-amber-600 border border-amber-200 font-black text-[9px] rounded-lg px-2.5 py-1 shadow-sm uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all cursor-default">Not Isolated</Badge>
                 )}
               </div>
               <div className="flex flex-col items-end">
-                {venvPath || (scanResult?.packages?.some(p => p.path?.includes(currentProject?.path)) ?? false) ? (
+                {(venvPath || (scanResult?.packages?.some(p => p.is_installed && p.path?.includes(currentProject?.path)) ?? false)) ? (
                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active shielding</span>
                 ) : (
                   <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Shielding Disabled</span>
@@ -659,21 +704,24 @@ const ProjectDetailsView = React.memo(({
               </Button>
             </div>
 
-            {!(venvPath || (scanResult?.packages?.some(p => p.path?.includes(currentProject?.path)) ?? false)) && (
+            {!(venvPath || (scanResult?.packages?.some(p => p.is_installed && p.path?.includes(currentProject?.path)) ?? false)) && (
               <div className="flex items-center justify-between px-1">
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">Relying on shared environment. Migration recommended.</span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">
+                  {projectType === 'python' ? 'Relying on shared environment. Migration recommended.' : 'Dependencies not isolated. Migration recommended.'}
+                </span>
                 <Button
                   size="sm"
+                  onClick={syncProject}
                   className="h-7 px-3 rounded-lg bg-slate-900 text-white hover:bg-indigo-600 text-[8px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
                 >
-                  Migrate to Local
+                  Migrate to Isolated
                 </Button>
               </div>
             )}
           </div>
 
           {/* Row 3: Scripts (Now under Env Path) */}
-          <div className="xl:col-span-8 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm group hover:border-indigo-100 transition-all h-[140px] overflow-hidden flex flex-col">
+          <div className="xl:col-span-8 bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm group hover:border-indigo-100 transition-all h-[140px] flex flex-col">
             <div className="flex items-center gap-3 mb-3">
               <motion.div
                 whileHover={{ scale: 1.1, y: -2 }}
@@ -685,7 +733,7 @@ const ProjectDetailsView = React.memo(({
                 <span className="text-slate-900 font-black uppercase text-[10px] tracking-[0.1em]">Project Scripts</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-[60px]">
+            <div className="flex flex-wrap gap-2 overflow-y-auto pt-2 pb-4 px-2 custom-scrollbar flex-1 min-h-[60px]">
               {busy && (!projectScripts || Object.keys(projectScripts).length === 0) ? (
                 <div className="w-full flex items-center justify-center h-full py-4">
                   <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin opacity-50" />
@@ -917,13 +965,15 @@ const ProjectDetailsView = React.memo(({
                         className="pl-11 h-10 bg-slate-50 border-slate-100 rounded-xl text-[13px] font-bold focus:bg-white focus:ring-2 focus:ring-indigo-500/10 transition-all"
                       />
                     </div>
-                    <Button
-                      onClick={handleSearch}
-                      disabled={busy || !searchQuery}
-                      className="h-10 px-5 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-md active:scale-95"
-                    >
-                      {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <Button
+                        onClick={handleSearch}
+                        disabled={busy || !searchQuery}
+                        className="h-10 px-5 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-md active:scale-95"
+                      >
+                        {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
+                      </Button>
+                    </motion.div>
                     {searchResults && searchResults.length > 0 && (
                       <Button
                         variant="outline"
@@ -1298,7 +1348,7 @@ const ProjectDetailsView = React.memo(({
                     viewMode={packageView}
                     venvPath={venvPath}
                     onUpdate={handleUpdate}
-                    onDelete={handleDelete}
+                    onDelete={handleDeleteClick}
                     onRevert={handleRevert}
                     onToggle={togglePackage}
                     selected={selectedPackages.has(pkg.path)}
@@ -1308,6 +1358,8 @@ const ProjectDetailsView = React.memo(({
                     isInstalling={installingPackages.get(pkg.name) !== undefined}
                     installProgress={installingPackages.get(pkg.name)?.progress}
                     installType={installingPackages.get(pkg.name)?.type}
+                    lastLog={installingPackages.get(pkg.name)?.lastLog}
+                    throughput={installingPackages.get(pkg.name)?.throughput}
                     openFolder={openFolder}
                     formatBytes={formatBytes}
                   />
@@ -1395,6 +1447,8 @@ const ProjectDetailsView = React.memo(({
                     isInstalling={installingPackages.get(pkg.name) !== undefined}
                     installProgress={installingPackages.get(pkg.name)?.progress}
                     installType={installingPackages.get(pkg.name)?.type}
+                    lastLog={installingPackages.get(pkg.name)?.lastLog}
+                    throughput={installingPackages.get(pkg.name)?.throughput}
                     openFolder={openFolder}
                     formatBytes={formatBytes}
                   />
@@ -1442,6 +1496,46 @@ const ProjectDetailsView = React.memo(({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Individual Delete Confirmation */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-[400px] border-rose-100 shadow-2xl shadow-rose-500/10 rounded-[2rem] p-0 overflow-hidden">
+          <div className="bg-rose-50/50 p-8 border-b border-rose-100 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-3xl bg-white border-2 border-rose-200 flex items-center justify-center shadow-sm shadow-rose-200/50">
+              <Trash2 className="w-8 h-8 text-rose-500" />
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-[18px] font-black uppercase tracking-tight text-slate-900">Uninstall Package</DialogTitle>
+              <DialogDescription className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">Security Clearance Required</DialogDescription>
+            </div>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <p className="text-[14px] text-slate-600 font-medium leading-relaxed text-center">
+              Are you sure you want to uninstall <span className="font-black text-rose-600 px-2 py-0.5 bg-rose-50 rounded-md">{packageToDelete?.name}</span>?
+              <br />
+              <span className="text-[10px] text-slate-400 mt-2 block font-bold uppercase tracking-wider">This action will remove the package from your local system.</span>
+            </p>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmDelete}
+                className="flex-1 h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-200 transition-all active:scale-95"
+              >
+                Proceed
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Toaster position="bottom-right" richColors theme="dark" />
     </motion.div>
   )
 })
