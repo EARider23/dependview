@@ -1,6 +1,8 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { ThemeProvider } from './hooks/useTheme'
+import './dark-theme.css'
 
 // Prevent the default web context menu (right-click) to make the app feel native
 document.addEventListener('contextmenu', e => {
@@ -10,4 +12,8 @@ document.addEventListener('contextmenu', e => {
   }
 });
 
-createRoot(document.getElementById('root')).render(<App />)
+createRoot(document.getElementById('root')).render(
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>
+)

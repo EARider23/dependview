@@ -1880,139 +1880,362 @@ fn detect_frameworks() -> Vec<Framework> {
   frameworks
 }
 
+
 // Detect technologies used in a project
 #[tauri::command]
 fn detect_project_technologies(project_path: String) -> Vec<String> {
   use std::fs;
   use std::path::Path;
-  
-  let mut technologies = Vec::new();
+
+  let mut technologies: Vec<String> = Vec::new();
   let root_path = Path::new(&project_path);
-  
-  // Folders to scan for deeper tech detection (monorepo support)
-  let subfolders = vec!["", "frontend", "backend", "client", "server", "web", "api", "studio"];
-  
+
+  // Scan root + common monorepo sub-directories
+  let subfolders: &[&str] = &[
+    "", "frontend", "backend", "client", "server", "web", "api", "app",
+    "packages/web", "packages/app", "apps/web", "apps/app", "apps/api",
+  ];
+
   for folder in subfolders {
     let current_path = if folder.is_empty() {
       root_path.to_path_buf()
     } else {
       root_path.join(folder)
     };
-    
-    if !current_path.exists() || !current_path.is_dir() {
-      continue;
-    }
+    if !current_path.exists() || !current_path.is_dir() { continue; }
 
-    // 1. Node.js / Javascript detection
-    let package_json_path = current_path.join("package.json");
-    if package_json_path.exists() {
-      if let Ok(content) = fs::read_to_string(&package_json_path) {
+    // ── 1. JavaScript / TypeScript (package.json) ──────────────────────
+    let pkg_json_path = current_path.join("package.json");
+    if pkg_json_path.exists() {
+      if let Ok(content) = fs::read_to_string(&pkg_json_path) {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-          let mut deps = Vec::new();
-          if let Some(dependencies) = json.get("dependencies").and_then(|d| d.as_object()) {
-            deps.extend(dependencies.keys().map(|k| k.as_str()));
+          let mut deps: Vec<String> = Vec::new();
+          if let Some(d) = json.get("dependencies").and_then(|v| v.as_object()) {
+            deps.extend(d.keys().cloned());
           }
-          if let Some(dev_dependencies) = json.get("devDependencies").and_then(|d| d.as_object()) {
-            deps.extend(dev_dependencies.keys().map(|k| k.as_str()));
+          if let Some(d) = json.get("devDependencies").and_then(|v| v.as_object()) {
+            deps.extend(d.keys().cloned());
           }
-          
-          // --- Main Frameworks ---
-          if deps.iter().any(|d| d.contains("react-native")) { technologies.push("react-native".to_string()); }
-          if deps.iter().any(|d| d == &"react" || d == &"react-dom") { technologies.push("react".to_string()); }
-          if deps.iter().any(|d| d.contains("next")) { technologies.push("nextjs".to_string()); }
-          if deps.iter().any(|d| d.contains("vue")) { technologies.push("vue".to_string()); }
-          if deps.iter().any(|d| d.contains("angular")) { technologies.push("angular".to_string()); }
-          if deps.iter().any(|d| d.contains("svelte")) { technologies.push("svelte".to_string()); }
-          if deps.iter().any(|d| d.contains("astro")) { technologies.push("astro".to_string()); }
-          if deps.iter().any(|d| d.contains("expo")) { technologies.push("expo".to_string()); }
-          
-          // --- Core Technologies ---
-          if deps.iter().any(|d| d.contains("tailwind")) { technologies.push("tailwind".to_string()); }
-          if deps.iter().any(|d| d.contains("typescript") || d == &"@types/react") { technologies.push("typescript".to_string()); }
-          if deps.iter().any(|d| d.contains("three") || d.contains("@react-three")) { technologies.push("three".to_string()); }
-          if deps.iter().any(|d| d.contains("supabase")) { technologies.push("supabase".to_string()); }
-          if deps.iter().any(|d| d.contains("firebase")) { technologies.push("firebase".to_string()); }
-          if deps.iter().any(|d| d.contains("express")) { technologies.push("express".to_string()); }
-          if deps.iter().any(|d| d.contains("nestjs")) { technologies.push("nestjs".to_string()); }
-          if deps.iter().any(|d| d.contains("tauri")) { technologies.push("tauri".to_string()); }
-          if deps.iter().any(|d| d.contains("vite")) { technologies.push("vite".to_string()); }
+          let dep         = |n: &str| deps.iter().any(|d| d == n);
+          let dep_has     = |s: &str| deps.iter().any(|d| d.contains(s));
+          let dep_starts  = |s: &str| deps.iter().any(|d| d.starts_with(s));
 
-          // --- State Management ---
-          if deps.iter().any(|d| d.contains("zustand")) { technologies.push("zustand".to_string()); }
-          if deps.iter().any(|d| d.contains("redux") || d.contains("@reduxjs/toolkit")) { technologies.push("redux".to_string()); }
-          if deps.iter().any(|d| d.contains("recoil") || d.contains("jotai")) { technologies.push("zustand".to_string()); } // Group simple state
+          // Full-stack JS (most specific first)
+          if dep("next")                                            { technologies.push("nextjs".to_string()); }
+          if dep("nuxt") || dep("nuxt3") || dep_starts("@nuxt/")  { technologies.push("nuxt".to_string()); }
+          if dep_starts("@remix-run/")                             { technologies.push("remix".to_string()); }
+          if dep("@sveltejs/kit")                                  { technologies.push("sveltekit".to_string()); }
+          if dep("astro")                                           { technologies.push("astro".to_string()); }
+          // Mobile JS
+          if dep_has("react-native")                               { technologies.push("react-native".to_string()); }
+          if dep("expo")                                            { technologies.push("expo".to_string()); }
+          // SPA
+          if dep("react") || dep("react-dom")                      { technologies.push("react".to_string()); }
+          if dep("vue") || dep_starts("@vue/")                     { technologies.push("vue".to_string()); }
+          if dep_starts("@angular/core")                            { technologies.push("angular".to_string()); }
+          if dep("svelte") && !technologies.contains(&"sveltekit".to_string()) { technologies.push("svelte".to_string()); }
+          if dep("solid-js")                                        { technologies.push("solidjs".to_string()); }
+          if dep("qwik") || dep_starts("@builder.io/qwik")         { technologies.push("qwik".to_string()); }
+          // Node.js backend
+          if dep_starts("@nestjs/core") || dep_starts("@nestjs/common") { technologies.push("nestjs".to_string()); }
+          if dep("express")                                         { technologies.push("express".to_string()); }
+          if dep("fastify")                                         { technologies.push("fastify".to_string()); }
+          if dep("hono")                                            { technologies.push("hono".to_string()); }
+          if dep("elysia")                                          { technologies.push("elysia".to_string()); }
+          // Desktop
+          if dep("electron")                                        { technologies.push("electron".to_string()); }
+          if dep_has("@tauri-apps/")                                { technologies.push("tauri".to_string()); }
+          // Build tools
+          if dep("vite") || dep_has("@vitejs/")                    { technologies.push("vite".to_string()); }
+          if dep_has("webpack")                                     { technologies.push("webpack".to_string()); }
+          // Language
+          if dep("typescript") || dep_starts("@types/")            { technologies.push("typescript".to_string()); }
+          // Styling
+          if dep("tailwindcss") || dep("tailwind")                  { technologies.push("tailwind".to_string()); }
+          // UI libraries
+          let has_components_json = current_path.join("components.json").exists();
+          let has_radix = dep_starts("@radix-ui/");
+          let has_cva   = dep("class-variance-authority");
+          if has_components_json || (has_radix && has_cva)          { technologies.push("shadcn-ui".to_string()); }
+          if dep_starts("@mui/") || dep_starts("@material-ui/")    { technologies.push("mui".to_string()); }
+          if dep_starts("@chakra-ui/")                              { technologies.push("chakra-ui".to_string()); }
+          if dep("antd") || dep_starts("@ant-design/")             { technologies.push("antd".to_string()); }
+          if dep_starts("@mantine/")                                { technologies.push("mantine".to_string()); }
+          // ORMs / DB clients
+          if dep("prisma") || dep("@prisma/client")                 { technologies.push("prisma".to_string()); }
+          if dep("drizzle-orm")                                     { technologies.push("drizzle".to_string()); }
+          if dep("pg") || dep_has("postgres")                       { technologies.push("postgresql".to_string()); }
+          if dep_has("mongodb") || dep("mongoose")                  { technologies.push("mongodb".to_string()); }
+          if dep("mysql2") || dep("mysql")                          { technologies.push("mysql".to_string()); }
+          if dep("better-sqlite3") || dep("sqlite3")                { technologies.push("sqlite".to_string()); }
+          if dep("redis") || dep("ioredis")                         { technologies.push("redis".to_string()); }
+          // BaaS
+          if dep_has("@supabase/")                                  { technologies.push("supabase".to_string()); }
+          if dep_has("firebase")                                    { technologies.push("firebase".to_string()); }
+          if dep("convex")                                          { technologies.push("convex".to_string()); }
+          if dep_has("@pocketbase/")                                { technologies.push("pocketbase".to_string()); }
+          if dep_has("@aws-sdk/") || dep_has("aws-sdk")             { technologies.push("aws".to_string()); }
+          // State management
+          if dep("zustand")                                         { technologies.push("zustand".to_string()); }
+          if dep_has("@reduxjs/toolkit") || dep("redux")            { technologies.push("redux".to_string()); }
+          if dep("jotai")                                           { technologies.push("jotai".to_string()); }
+          if dep("recoil")                                          { technologies.push("recoil".to_string()); }
+          if dep("pinia")                                           { technologies.push("pinia".to_string()); }
+          if dep("mobx") || dep("mobx-react")                       { technologies.push("mobx".to_string()); }
+          // 3D
+          if dep("three") || dep_has("@react-three/")               { technologies.push("threejs".to_string()); }
+          // GraphQL
+          if dep("graphql") || dep_has("@apollo/")                  { technologies.push("graphql".to_string()); }
+          // Auth
+          if dep("next-auth") || dep_starts("@auth/")               { technologies.push("nextauth".to_string()); }
+          if dep_starts("@clerk/")                                   { technologies.push("clerk".to_string()); }
+          if dep_starts("@lucia-auth/") || dep("lucia")             { technologies.push("lucia".to_string()); }
+          // CMS
+          if dep("sanity") || dep_has("@sanity/")                   { technologies.push("sanity".to_string()); }
+          if dep("@strapi/strapi") || dep("strapi")                  { technologies.push("strapi".to_string()); }
+          // Payment
+          if dep("stripe") || dep_starts("@stripe/")               { technologies.push("stripe".to_string()); }
+          // Testing
+          if dep("vitest")                                          { technologies.push("vitest".to_string()); }
+          if dep("jest")                                            { technologies.push("jest".to_string()); }
+          if dep_starts("@playwright/")                             { technologies.push("playwright".to_string()); }
+          if dep("cypress")                                         { technologies.push("cypress".to_string()); }
+          // Monorepo
+          if dep("turbo") || dep_has("@turbo/")                     { technologies.push("turborepo".to_string()); }
+          if dep_starts("nx")                                       { technologies.push("nx".to_string()); }
         }
       }
     }
-    
-    // 2. Python detection (Improved)
-    let has_py_files = if let Ok(entries) = fs::read_dir(&current_path) {
-        entries.flatten().any(|e| e.file_name().to_string_lossy().ends_with(".py"))
-    } else { false };
 
-    if current_path.join("requirements.txt").exists() || current_path.join("pyproject.toml").exists() || has_py_files {
-      if current_path.join("manage.py").exists() { 
-        technologies.push("django".to_string()); 
+    // ── 2. Python ──────────────────────────────────────────────────────
+    // Only trigger on proper Python project markers, NOT loose .py utility scripts
+    let is_python_project = current_path.join("requirements.txt").exists()
+      || current_path.join("pyproject.toml").exists()
+      || current_path.join("setup.py").exists()
+      || current_path.join("setup.cfg").exists()
+      || current_path.join("Pipfile").exists();
+    if is_python_project {
+      let py_content =
+        fs::read_to_string(current_path.join("requirements.txt")).unwrap_or_default().to_lowercase()
+        + &fs::read_to_string(current_path.join("pyproject.toml")).unwrap_or_default().to_lowercase();
+      if current_path.join("manage.py").exists() || py_content.contains("django") {
+        technologies.push("django".to_string());
+      } else if py_content.contains("fastapi") {
+        technologies.push("fastapi".to_string());
+      } else if py_content.contains("flask") {
+        technologies.push("flask".to_string());
       } else {
         technologies.push("python".to_string());
       }
     }
-    
-    // 3. PHP detection
-    if current_path.join("composer.json").exists() || current_path.join("artisan").exists() {
-      if current_path.join("artisan").exists() { 
-        technologies.push("laravel".to_string()); 
-      } else {
-        technologies.push("php".to_string());
+
+    // ── 3. Rust ────────────────────────────────────────────────────────
+    if current_path.join("Cargo.toml").exists() {
+      technologies.push("rust".to_string());
+      if let Ok(cargo) = fs::read_to_string(current_path.join("Cargo.toml")) {
+        if cargo.contains("axum")       { technologies.push("axum".to_string()); }
+        if cargo.contains("actix-web")  { technologies.push("actix".to_string()); }
+        if cargo.contains("rocket")     { technologies.push("rocket".to_string()); }
+        if cargo.contains("warp")       { technologies.push("warp".to_string()); }
       }
     }
-    
-    // 4. Other Ecosystems
-    if current_path.join("Cargo.toml").exists() { technologies.push("rust".to_string()); }
-    if current_path.join("go.mod").exists() { technologies.push("go".to_string()); }
-    if current_path.join("pubspec.yaml").exists() { technologies.push("flutter".to_string()); }
-    if current_path.join("Dockerfile").exists() || current_path.join("docker-compose.yml").exists() { technologies.push("docker".to_string()); }
-  }
-  
-  // --- Post-Processing & De-bloat ---
-  technologies.sort();
-  technologies.dedup();
-  
-  let mut final_techs = Vec::new();
-  
-  // Prioritize and Filter Redundant
-  if technologies.contains(&"nextjs".to_string()) { 
-    final_techs.push("nextjs".to_string()); 
-  } else if technologies.contains(&"react-native".to_string()) {
-    final_techs.push("react-native".to_string());
-  } else if technologies.contains(&"react".to_string()) {
-    final_techs.push("react".to_string());
-  }
-  
-  if technologies.contains(&"django".to_string()) { final_techs.push("django".to_string()); }
-  else if technologies.contains(&"python".to_string()) { final_techs.push("python".to_string()); }
-  
-  if technologies.contains(&"laravel".to_string()) { final_techs.push("laravel".to_string()); }
-  else if technologies.contains(&"php".to_string()) { final_techs.push("php".to_string()); }
 
-  // Add others that are not frameworks but "main tech"
-  let main_tech_keys = vec![
-    "three", "supabase", "firebase", "tailwind", "typescript", 
-    "rust", "go", "flutter", "docker", "tauri", "vite", "zustand", "redux",
-    "vue", "angular", "svelte", "astro", "express", "nestjs"
-  ];
-  
-  for key in main_tech_keys {
-    if technologies.contains(&key.to_string()) && !final_techs.contains(&key.to_string()) {
-      final_techs.push(key.to_string());
+    // ── 4. Go ──────────────────────────────────────────────────────────
+    if current_path.join("go.mod").exists() {
+      technologies.push("go".to_string());
+      if let Ok(go_mod) = fs::read_to_string(current_path.join("go.mod")) {
+        if go_mod.contains("gin-gonic/gin")  { technologies.push("gin".to_string()); }
+        if go_mod.contains("gofiber/fiber")  { technologies.push("fiber".to_string()); }
+        if go_mod.contains("labstack/echo")  { technologies.push("echo".to_string()); }
+        if go_mod.contains("go-chi/chi")     { technologies.push("chi".to_string()); }
+      }
+    }
+
+    // ── 5. PHP ─────────────────────────────────────────────────────────
+    if current_path.join("composer.json").exists() {
+      if current_path.join("artisan").exists() {
+        technologies.push("laravel".to_string());
+      } else if let Ok(content) = fs::read_to_string(current_path.join("composer.json")) {
+        if content.contains("symfony/framework")  { technologies.push("symfony".to_string()); }
+        else if content.contains("wordpress")     { technologies.push("wordpress".to_string()); }
+        else                                       { technologies.push("php".to_string()); }
+      } else { technologies.push("php".to_string()); }
+    }
+
+    // ── 6. Ruby ────────────────────────────────────────────────────────
+    if current_path.join("Gemfile").exists() {
+      if let Ok(gemfile) = fs::read_to_string(current_path.join("Gemfile")) {
+        if gemfile.contains("rails")         { technologies.push("rails".to_string()); }
+        else if gemfile.contains("sinatra")  { technologies.push("sinatra".to_string()); }
+        else                                  { technologies.push("ruby".to_string()); }
+      } else { technologies.push("ruby".to_string()); }
+    }
+
+    // ── 7. Java / Kotlin / Android ─────────────────────────────────────
+    let has_pom    = current_path.join("pom.xml").exists();
+    let has_gradle = current_path.join("build.gradle").exists()
+      || current_path.join("build.gradle.kts").exists();
+    if has_pom || has_gradle {
+      let build_content =
+        fs::read_to_string(current_path.join("pom.xml")).unwrap_or_default()
+        + &fs::read_to_string(current_path.join("build.gradle")).unwrap_or_default()
+        + &fs::read_to_string(current_path.join("build.gradle.kts")).unwrap_or_default();
+      if build_content.contains("spring-boot") || build_content.contains("spring-framework") {
+        technologies.push("spring".to_string());
+      } else if current_path.join("build.gradle.kts").exists() || build_content.contains("kotlin") {
+        technologies.push("kotlin".to_string());
+      } else {
+        technologies.push("java".to_string());
+      }
+      if build_content.contains("android") { technologies.push("android".to_string()); }
+    }
+    if current_path.join("AndroidManifest.xml").exists() { technologies.push("android".to_string()); }
+
+    // ── 8. .NET / C# / F# ──────────────────────────────────────────────
+    let has_dotnet_proj = if let Ok(entries) = fs::read_dir(&current_path) {
+      entries.flatten().any(|e| {
+        let n = e.file_name().to_string_lossy().to_string();
+        n.ends_with(".csproj") || n.ends_with(".sln") || n.ends_with(".fsproj")
+      })
+    } else { false };
+    if has_dotnet_proj {
+      technologies.push("dotnet".to_string());
+      if let Ok(entries) = fs::read_dir(&current_path) {
+        for entry in entries.flatten() {
+          if entry.file_name().to_string_lossy().ends_with(".csproj") {
+            if let Ok(content) = fs::read_to_string(entry.path()) {
+              if content.contains("Microsoft.AspNetCore") {
+                technologies.push("aspnet".to_string());
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── 9. Flutter / Dart ──────────────────────────────────────────────
+    if current_path.join("pubspec.yaml").exists() { technologies.push("flutter".to_string()); }
+
+    // ── 10. Swift / iOS ────────────────────────────────────────────────
+    if current_path.join("Package.swift").exists() { technologies.push("swift".to_string()); }
+    let has_xcode = if let Ok(entries) = fs::read_dir(&current_path) {
+      entries.flatten().any(|e| {
+        let n = e.file_name().to_string_lossy().to_string();
+        n.ends_with(".xcodeproj") || n.ends_with(".xcworkspace")
+      })
+    } else { false };
+    if has_xcode { technologies.push("swift".to_string()); }
+
+    // ── 11. Elixir / Phoenix ───────────────────────────────────────────
+    if current_path.join("mix.exs").exists() {
+      if let Ok(mix) = fs::read_to_string(current_path.join("mix.exs")) {
+        if mix.contains(":phoenix") { technologies.push("phoenix".to_string()); }
+        else                         { technologies.push("elixir".to_string()); }
+      }
+    }
+
+    // ── 12. Deno ───────────────────────────────────────────────────────
+    if current_path.join("deno.json").exists() || current_path.join("deno.jsonc").exists() {
+      technologies.push("deno".to_string());
+    }
+
+    // ── 13. Bun ────────────────────────────────────────────────────────
+    if current_path.join("bun.lockb").exists() || current_path.join("bun.lock").exists() {
+      technologies.push("bun".to_string());
+    }
+
+    // ── 14. Infrastructure / DevOps ────────────────────────────────────
+    if current_path.join("Dockerfile").exists()
+      || current_path.join("docker-compose.yml").exists()
+      || current_path.join("docker-compose.yaml").exists() {
+      technologies.push("docker".to_string());
+    }
+    if current_path.join("k8s").exists()
+      || current_path.join("kubernetes").exists()
+      || current_path.join("helm").exists() {
+      technologies.push("kubernetes".to_string());
     }
   }
 
-  // Final count limit to keep it "fastly" understandable
+  // ── Post-Processing: Deduplicate ──────────────────────────────────────
+  technologies.sort();
+  technologies.dedup();
+
+  let mut final_techs: Vec<String> = Vec::new();
+  let has      = |t: &str| technologies.contains(&t.to_string());
+  let push_if  = |v: &mut Vec<String>, t: &str| {
+    if !v.contains(&t.to_string()) { v.push(t.to_string()); }
+  };
+
+  // ── Tier 1: Primary Framework — most specific wins, pick exactly ONE ──
+  let framework_priority: &[&str] = &[
+    "nextjs", "nuxt", "remix", "sveltekit", "astro",
+    "expo", "react-native",
+    "electron",
+    "react", "vue", "angular", "svelte", "solidjs", "qwik",
+    "spring", "django", "fastapi", "flask",
+    "laravel", "symfony", "rails", "phoenix",
+    "nestjs", "express", "fastify", "hono", "elysia",
+    "flutter", "android",
+  ];
+  for fw in framework_priority {
+    if has(fw) { push_if(&mut final_techs, fw); break; }
+  }
+
+  // ── Tier 2: Language runtime ─────────────────────────────────────────
+  let primary         = final_techs.first().cloned().unwrap_or_default();
+  let primary_str     = primary.as_str();
+  let py_fws: &[&str] = &["django", "fastapi", "flask"];
+  let php_fws: &[&str]= &["laravel", "symfony", "wordpress"];
+  let rb_fws: &[&str] = &["rails", "sinatra"];
+  let jv_fws: &[&str] = &["spring", "android"];
+
+  if has("rust")   { push_if(&mut final_techs, "rust"); }
+  if has("go")     { push_if(&mut final_techs, "go"); }
+  if has("dotnet") { push_if(&mut final_techs, "dotnet"); }
+  if has("kotlin") && !jv_fws.contains(&primary_str)  { push_if(&mut final_techs, "kotlin"); }
+  if has("swift")                                   { push_if(&mut final_techs, "swift"); }
+  if has("java") && !jv_fws.contains(&primary_str) && !has("kotlin") { push_if(&mut final_techs, "java"); }
+  if has("python") && !py_fws.contains(&primary_str)  { push_if(&mut final_techs, "python"); }
+  if has("ruby")   && !rb_fws.contains(&primary_str)  { push_if(&mut final_techs, "ruby"); }
+  if has("php")    && !php_fws.contains(&primary_str) { push_if(&mut final_techs, "php"); }
+  if has("elixir") && primary_str != "phoenix"         { push_if(&mut final_techs, "elixir"); }
+  if has("phoenix")&& primary_str != "phoenix"         { push_if(&mut final_techs, "phoenix"); }
+  if has("deno")   { push_if(&mut final_techs, "deno"); }
+
+  // ── Tier 3: Cross-cutting runtimes ────────────────────────────────────
+  if has("tauri") { push_if(&mut final_techs, "tauri"); }
+  if has("bun")   { push_if(&mut final_techs, "bun"); }
+
+  // ── Tier 4: Secondary technologies, ordered by usefulness ────────────
+  let secondary: &[&str] = &[
+    "prisma", "drizzle",
+    "postgresql", "mongodb", "mysql", "sqlite", "redis",
+    "supabase", "firebase", "convex", "pocketbase",
+    "shadcn-ui", "mui", "chakra-ui", "antd", "mantine",
+    "zustand", "redux", "jotai", "pinia", "recoil", "mobx",
+    "graphql",
+    "nextauth", "clerk", "lucia",
+    "tailwind", "typescript", "vite", "webpack",
+    "threejs",
+    "docker", "kubernetes",
+    "stripe", "sanity", "strapi",
+    "vitest", "jest", "playwright", "cypress",
+    "turborepo", "nx",
+    "axum", "actix", "rocket", "gin", "fiber", "echo",
+    "aws",
+  ];
+  for key in secondary {
+    if has(key) { push_if(&mut final_techs, key); }
+  }
+
+  // Cap to 8 for display clarity
   final_techs.truncate(8);
-  
   final_techs
 }
+
+
 
 
 // Delete project folder from disk
@@ -2780,6 +3003,90 @@ fn open_folder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn save_project_icon(project_path: String, base64_data: String) -> Result<String, String> {
+  let raw_b64 = if let Some(idx) = base64_data.find(',') {
+    &base64_data[idx + 1..]
+  } else {
+    &base64_data
+  };
+  let bytes = general_purpose::STANDARD
+    .decode(raw_b64)
+    .map_err(|e| format!("base64 decode error: {}", e))?;
+
+  // Determine extension from data url or assume png
+  let ext = if base64_data.contains("image/jpeg") || base64_data.contains("image/jpg") {
+    "jpg"
+  } else {
+    "png"
+  };
+
+  let dir_path = Path::new(&project_path).join(".peeakthings");
+  if !dir_path.exists() {
+    let _ = fs::create_dir_all(&dir_path);
+  }
+  let file_path = dir_path.join(format!("icon.{}", ext));
+  fs::write(&file_path, &bytes)
+    .map_err(|e| format!("write error: {}", e))?;
+
+  // Make sure it exists and format correctly for file:// protocol on Windows
+  // tauri's convertFileSrc will handle this correctly if we just return the path
+  Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn get_project_icon(project_path: String) -> Option<String> {
+  let dir_path = Path::new(&project_path).join(".peeakthings");
+  let png_path = dir_path.join("icon.png");
+  if png_path.exists() {
+    return Some(png_path.to_string_lossy().to_string());
+  }
+  let jpg_path = dir_path.join("icon.jpg");
+  if jpg_path.exists() {
+    return Some(jpg_path.to_string_lossy().to_string());
+  }
+  // Fallback to old path just in case
+  let old_png_path = Path::new(&project_path).join(".peeak-icon.png");
+  if old_png_path.exists() {
+    return Some(old_png_path.to_string_lossy().to_string());
+  }
+  let old_jpg_path = Path::new(&project_path).join(".peeak-icon.jpg");
+  if old_jpg_path.exists() {
+    return Some(old_jpg_path.to_string_lossy().to_string());
+  }
+  None
+}
+
+#[tauri::command]
+fn save_share_image(base64_data: String, filename: String) -> Result<String, String> {
+  // Decode base64 PNG (strip data URL prefix if present)
+  let raw_b64 = if let Some(idx) = base64_data.find(',') {
+    &base64_data[idx + 1..]
+  } else {
+    &base64_data
+  };
+  let bytes = general_purpose::STANDARD
+    .decode(raw_b64)
+    .map_err(|e| format!("base64 decode error: {}", e))?;
+
+  // Resolve save path: prefer user's Downloads folder, fallback to home
+  let save_dir = dirs::download_dir()
+    .or_else(|| dirs::home_dir())
+    .ok_or_else(|| "Could not find Downloads folder".to_string())?;
+
+  let safe_name = filename
+    .chars()
+    .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' { c } else { '_' })
+    .collect::<String>();
+  let safe_name = if safe_name.ends_with(".png") { safe_name } else { format!("{}.png", safe_name) };
+
+  let file_path = save_dir.join(&safe_name);
+  fs::write(&file_path, &bytes)
+    .map_err(|e| format!("write error: {}", e))?;
+
+  Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn open_in_editor(path: String, editor: String) -> Result<(), String> {
   let path_buf = Path::new(&path);
   if !path_buf.exists() {
@@ -3442,7 +3749,10 @@ pub fn run() {
       run_npm_audit,
       fix_npm_audit,
       read_env_file,
-      write_env_file
+      write_env_file,
+      save_share_image,
+      save_project_icon,
+      get_project_icon
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

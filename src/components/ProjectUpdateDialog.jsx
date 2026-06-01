@@ -29,7 +29,7 @@ export function ProjectUpdateDialog({ open, onOpenChange, candidates = [], onUpd
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] bg-white border border-gray-100 shadow-xl">
+      <DialogContent className="sm:max-w-[700px] bg-card border border-border shadow-xl">
         <DialogHeader>
           <div>
             <DialogTitle className="text-2xl font-bold">Project Package Updates</DialogTitle>
@@ -44,12 +44,12 @@ export function ProjectUpdateDialog({ open, onOpenChange, candidates = [], onUpd
 
           <div className="space-y-2 max-h-72 overflow-auto">
             {candidates.map((c) => (
-              <div key={c.name} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+              <div key={c.name} className="flex items-center justify-between p-2 rounded hover:bg-muted">
                 <div className="flex items-center gap-3">
                   <Checkbox checked={selected.has(c.name)} onCheckedChange={() => toggle(c.name)} />
                   <div className="min-w-0">
                     <div className="font-medium truncate">{c.name}</div>
-                    <div className="text-xs text-gray-500">Current: {c.currentVersion} • Latest: {c.latestVersion}</div>
+                    <div className="text-xs text-muted-foreground">Current: {c.currentVersion} • Latest: {c.latestVersion}</div>
                   </div>
                 </div>
                 <div className="text-xs text-gray-400">{c.manager}</div>

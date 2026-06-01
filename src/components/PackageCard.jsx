@@ -39,7 +39,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     ? 'border-indigo-400 bg-indigo-50/50'
                     : hasUpdate
                         ? 'border-amber-400 bg-amber-50/40 shadow-[0_0_15px_rgba(251,191,36,0.15)]'
-                        : 'border-slate-100 bg-white hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/10'
+                        : 'border-border bg-card hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/10'
                 }
             `}>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -49,7 +49,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                         className="h-4 w-4 border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
                     />
 
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center p-1.5 flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
+                    <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center p-1.5 flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
                         {techIconData?.image ? (
                             <img src={techIconData.image} className="w-full h-full object-contain" />
                         ) : pkg.icon ? (
@@ -61,9 +61,9 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
 
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                            <span className="font-black text-[14px] text-slate-900 truncate">{pkg.name}</span>
+                            <span className="font-black text-[14px] text-foreground truncate">{pkg.name}</span>
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[11px] font-bold font-mono text-slate-500">v{pkg.version}</span>
+                                <span className="text-[11px] font-bold font-mono text-muted-foreground">v{pkg.version}</span>
                                 {hasUpdate && (
                                     <>
                                         <div className="w-2.5 h-[1px] bg-amber-300" />
@@ -79,14 +79,14 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                             className="flex items-center gap-1 hover:text-indigo-600 transition-colors group/path"
                         >
                             <ExternalLink className="w-2.5 h-2.5 text-slate-300 group-hover/path:text-indigo-400" />
-                            <span className="text-[10px] font-mono text-slate-500 truncate max-w-[250px]">{pkg.path}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[250px]">{pkg.path}</span>
                         </button>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-4 flex-shrink-0">
                     <div className="flex flex-col items-end">
-                        <span className="text-[11px] font-bold font-mono text-slate-800 uppercase tracking-tighter">{formatBytes(pkg.size)}</span>
+                        <span className="text-[11px] font-bold font-mono text-foreground uppercase tracking-tighter">{formatBytes(pkg.size)}</span>
                         <div className="flex items-center gap-1">
                             <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : isPending ? 'bg-amber-400 animate-pulse' : 'bg-slate-300'}`} />
                             <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-emerald-600' : isPending ? 'text-amber-600' : 'text-slate-600'}`}>
@@ -109,7 +109,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                                                 <span className="ml-auto text-[8px] font-bold text-amber-600 font-mono">{throughput}</span>
                                             )}
                                         </div>
-                                        <div className="w-full h-1.5 bg-white/50 rounded-full overflow-hidden border border-amber-200/50 p-[1px]">
+                                        <div className="w-full h-1.5 bg-card/50 rounded-full overflow-hidden border border-amber-200/50 p-[1px]">
                                             <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${installProgress}%` }}
@@ -126,7 +126,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                                     <Button
                                         size="sm"
                                         onClick={handleUpdate}
-                                        className={`h-7 px-2 ${isPending ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-amber-400 hover:bg-amber-500 text-black'} text-[9px] font-black uppercase rounded-lg border border-slate-500/10 shadow-sm transition-all active:scale-95`}
+                                        className={`h-7 px-2 ${isPending ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-amber-400 hover:bg-amber-500 !text-black'} text-[9px] font-black uppercase rounded-lg border border-slate-500/10 shadow-sm transition-all active:scale-95`}
                                     >
                                         {isPending ? <Download className="w-3 h-3 mr-1" /> : <ArrowUp className="w-3 h-3 mr-1" />} 
                                         {isPending ? 'Install' : 'Update'}
@@ -134,7 +134,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                                 )}
                             </div>
                         )}
-                        <div className="flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 group-hover:bg-white transition-colors">
+                        <div className="flex items-center gap-1 px-2 py-1 bg-muted rounded-lg border border-border group-hover:bg-card transition-colors">
                             {managerIcon.image ? (
                                 <img src={managerIcon.image} className="w-3.5 h-3.5 grayscale group-hover:grayscale-0 transition-all duration-300" />
                             ) : (
@@ -175,13 +175,13 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     ? 'border-amber-400 bg-amber-50/30 shadow-[0_8px_30px_rgb(251,191,36,0.15)]'
                     : selected
                         ? 'border-indigo-500 bg-indigo-50/30 shadow-sm'
-                        : 'border-slate-100 bg-white hover:border-purple-600 hover:shadow-xl hover:shadow-purple-500/10 active:scale-[0.98]'
+                        : 'border-border bg-card hover:border-purple-600 hover:shadow-xl hover:shadow-purple-500/10 active:scale-[0.98]'
             }
         `}>
             {/* Floating Update Indicator - Stacked Above */}
             {hasUpdate && (
                 <div className="absolute -top-3 -right-2 w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center shadow-lg shadow-amber-200 z-10">
-                    <ArrowUp className="w-4.5 h-4.5 text-black font-black" />
+                    <ArrowUp className="w-4.5 h-4.5 !text-black font-black" />
                 </div>
             )}
 
@@ -193,7 +193,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                         onCheckedChange={handleToggle}
                         className="h-5 w-5 border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 shadow-sm"
                     />
-                    <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-300 ${isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : isPending ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                    <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-300 ${isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : isPending ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-muted border-border text-muted-foreground'}`}>
                         <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : isPending ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
                         <span className="text-[10px] font-black uppercase tracking-wider">
                             {isActive ? 'Active' : isPending ? 'Pending' : 'Idle'}
@@ -204,7 +204,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                 <div className="flex items-center gap-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors bg-slate-50 rounded-lg hover:bg-slate-100">
+                            <button className="p-1.5 text-slate-400 hover:text-foreground transition-colors bg-muted rounded-lg hover:bg-slate-100">
                                 <MoreVertical className="w-4 h-4" />
                             </button>
                         </DropdownMenuTrigger>
@@ -230,19 +230,19 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
 
             {/* Middle: Brand & Identity */}
             <div className="flex items-center gap-4 mb-5">
-                <div className={`w-14 h-14 rounded-2xl border-2 bg-white flex items-center justify-center p-3 shadow-sm group-hover:scale-110 transition-transform duration-500 ${hasUpdate ? 'border-amber-300 shadow-amber-50' : 'border-slate-50'}`}>
+                <div className={`w-14 h-14 rounded-2xl border-2 bg-card flex items-center justify-center p-3 shadow-sm group-hover:scale-110 transition-transform duration-500 ${hasUpdate ? 'border-amber-300 shadow-amber-50' : 'border-slate-50'}`}>
                     {techIconData?.image ? (
                         <img src={techIconData.image} className="w-full h-full object-contain" />
                     ) : pkg.icon ? (
                         <img src={pkg.icon} className="w-full h-full object-contain" />
                     ) : (
-                        <div className="w-full h-full rounded-xl flex items-center justify-center bg-slate-50">
+                        <div className="w-full h-full rounded-xl flex items-center justify-center bg-muted">
                             <Package className="w-7 h-7 text-slate-300" />
                         </div>
                     )}
                 </div>
                 <div className="min-w-0">
-                    <h3 className="font-black text-[16px] text-slate-900 truncate leading-tight mb-1 group-hover:text-purple-600 transition-colors" title={pkg.name}>
+                    <h3 className="font-black text-[16px] text-foreground truncate leading-tight mb-1 group-hover:text-purple-600 transition-colors" title={pkg.name}>
                         {pkg.name}
                     </h3>
                     <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                             <div className="bg-slate-900/90 backdrop-blur-md rounded-xl p-2.5 border border-slate-800 shadow-xl">
                                 <div className="flex items-center gap-1.5 mb-1.5">
                                     <Terminal className="w-2.5 h-2.5 text-cyan-400" />
-                                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Registry Feed</span>
+                                    <span className="text-[7px] font-black text-muted-foreground uppercase tracking-[0.2em]">Live Registry Feed</span>
                                 </div>
                                 <p className="text-[8px] font-mono text-slate-300 truncate leading-relaxed">
                                     {lastLog}
@@ -297,9 +297,9 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                     </motion.div>
                 )}
 
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-purple-100 transition-all duration-300">
+                <div className="flex items-center justify-between p-2.5 bg-muted rounded-2xl border border-border group-hover:bg-card group-hover:border-purple-100 transition-all duration-300">
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 pr-3 border-r border-slate-200">
+                        <div className="flex items-center gap-2 pr-3 border-r border-border">
                             {managerIcon.image ? (
                                 <img src={managerIcon.image} className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all duration-500" />
                             ) : (
@@ -307,7 +307,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                             )}
                             <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter">{pkg.manager}</span>
                         </div>
-                        <span className="text-[12px] font-bold font-mono text-slate-900 tabular-nums">{formatBytes(pkg.size)}</span>
+                        <span className="text-[12px] font-bold font-mono text-foreground tabular-nums">{formatBytes(pkg.size)}</span>
                     </div>
 
                     {(hasUpdate || isPending) && !isInstalling && (
@@ -315,7 +315,7 @@ export const PackageCard = memo(({ pkg, selected, onToggle, onUpdate, onDelete, 
                             <Button
                                 size="sm"
                                 onClick={handleUpdate}
-                                className={`h-8 px-3 ${isPending ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200/50' : 'bg-amber-400 hover:bg-amber-500 text-black shadow-amber-200/50'} text-[10px] font-black uppercase rounded-xl shadow-lg border border-slate-500/10 transition-all active:scale-95 group/up`}
+                                className={`h-8 px-3 ${isPending ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200/50' : 'bg-amber-400 hover:bg-amber-500 !text-black shadow-amber-200/50'} text-[10px] font-black uppercase rounded-xl shadow-lg border border-slate-500/10 transition-all active:scale-95 group/up`}
                             >
                                 {isPending ? <Download className="w-3.5 h-3.5 mr-1 group-hover/up:translate-y-0.5 transition-transform" /> : <ArrowUp className="w-3.5 h-3.5 mr-1 group-hover/up:-translate-y-0.5 transition-transform" />} 
                                 {isPending ? 'Install' : 'Update'}

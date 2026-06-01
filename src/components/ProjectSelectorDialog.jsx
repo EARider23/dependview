@@ -11,7 +11,7 @@ export function ProjectSelectorDialog({ open, onOpenChange, projects, onSelect, 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] bg-white border border-gray-100 shadow-xl">
+            <DialogContent className="sm:max-w-[500px] bg-card border border-border shadow-xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-bold">Select Installation Location</DialogTitle>
                     <DialogDescription>
@@ -24,7 +24,7 @@ export function ProjectSelectorDialog({ open, onOpenChange, projects, onSelect, 
                         <RadioGroupItem value="global" id="global" />
                         <Label htmlFor="global" className="flex-1 cursor-pointer">
                             <div className="font-bold">Global Installation</div>
-                            <div className="text-sm text-gray-500">Install system-wide (available everywhere)</div>
+                            <div className="text-sm text-muted-foreground">Install system-wide (available everywhere)</div>
                         </Label>
                     </div>
 
@@ -33,12 +33,12 @@ export function ProjectSelectorDialog({ open, onOpenChange, projects, onSelect, 
                             <RadioGroupItem value={project.path} id={project.path} />
                             <Label htmlFor={project.path} className="flex-1 cursor-pointer">
                                 <div className="font-bold">{project.name}</div>
-                                <div className="text-sm text-gray-500 truncate">{project.path}</div>
+                                <div className="text-sm text-muted-foreground truncate">{project.path}</div>
                             </Label>
                             <button
                                 title="Remove from imported projects"
                                 onClick={(e) => { e.stopPropagation(); onRemove && onRemove(project.path); }}
-                                className="p-2 rounded-md bg-white/50 hover:bg-red-100 text-gray-600"
+                                className="p-2 rounded-md bg-card/50 hover:bg-red-100 text-gray-600"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>

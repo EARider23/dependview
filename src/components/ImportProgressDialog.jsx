@@ -15,7 +15,7 @@ export function ImportProgressDialog({ open, projectName, stage, packageCount, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] bg-white border-none shadow-2xl rounded-[2rem] p-10 outline-none overflow-hidden" hideClose>
+      <DialogContent className="sm:max-w-[480px] bg-card border-none shadow-2xl rounded-[2rem] p-10 outline-none overflow-hidden" hideClose>
         <div className="relative">
           {/* Custom Close Button */}
           <button 
@@ -26,7 +26,7 @@ export function ImportProgressDialog({ open, projectName, stage, packageCount, o
           </button>
 
           <div className="mb-10">
-            <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">Importing Project</h2>
+            <h2 className="text-3xl font-black text-foreground tracking-tight mb-1">Importing Project</h2>
             <p className="text-gray-400 font-bold uppercase tracking-widest text-[11px] font-mono">{projectName}</p>
           </div>
 
@@ -39,7 +39,7 @@ export function ImportProgressDialog({ open, projectName, stage, packageCount, o
               return (
                 <div key={s.key} className="flex items-center gap-6 group">
                   <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 ${
-                    isDone ? 'bg-purple-50' : isActive ? 'bg-purple-50 shadow-inner' : 'bg-gray-50'
+                    isDone ? 'bg-purple-50' : isActive ? 'bg-purple-50 shadow-inner' : 'bg-muted'
                   }`}>
                     {isDone ? (
                       <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]" />
@@ -51,7 +51,7 @@ export function ImportProgressDialog({ open, projectName, stage, packageCount, o
                   </div>
                   <div className="flex-1">
                     <p className={`text-lg font-black tracking-tight transition-colors duration-500 ${
-                      isActive ? 'text-purple-600' : isDone ? 'text-gray-900 opacity-60' : 'text-gray-300'
+                      isActive ? 'text-purple-600' : isDone ? 'text-foreground opacity-60' : 'text-gray-300'
                     }`}>
                       {s.label}
                     </p>

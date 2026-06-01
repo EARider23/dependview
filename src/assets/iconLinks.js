@@ -126,14 +126,20 @@ import yarnIcon from './Yarn.png'
 
 export const techIcons = {
     // Core Frameworks
-    'react': { name: 'React', color: 'bg-white', icon: '⚛️', textColor: 'text-cyan-500', image: reactIcon },
+    'react': { name: 'React', color: 'bg-card', icon: '⚛️', textColor: 'text-cyan-500', image: reactIcon },
     'nextjs': { name: 'Next.js', color: 'bg-black', icon: '▲', textColor: 'text-white', image: nextjsIcon },
-    'vue': { name: 'Vue', color: 'bg-white', icon: 'V', textColor: 'text-green-500', image: vueIcon },
-    'svelte': { name: 'Svelte', color: 'bg-white', icon: 'S', textColor: 'text-orange-500', image: svelteIcon },
-    'angular': { name: 'Angular', color: 'bg-white', icon: 'A', textColor: 'text-red-600', image: angularIcon },
-    'astro': { name: 'Astro', color: 'bg-white', icon: '🚀', textColor: 'text-orange-500', image: astroIcon },
+    'nuxt': { name: 'Nuxt', color: 'bg-emerald-500', icon: 'N', textColor: 'text-white', image: vueIcon },
+    'remix': { name: 'Remix', color: 'bg-gray-900', icon: 'R', textColor: 'text-white', image: reactIcon },
+    'sveltekit': { name: 'SvelteKit', color: 'bg-orange-600', icon: 'SK', textColor: 'text-white', image: svelteIcon },
+    'vue': { name: 'Vue', color: 'bg-card', icon: 'V', textColor: 'text-green-500', image: vueIcon },
+    'svelte': { name: 'Svelte', color: 'bg-card', icon: 'S', textColor: 'text-orange-500', image: svelteIcon },
+    'angular': { name: 'Angular', color: 'bg-card', icon: 'A', textColor: 'text-red-600', image: angularIcon },
+    'astro': { name: 'Astro', color: 'bg-card', icon: '🚀', textColor: 'text-orange-500', image: astroIcon },
+    'solidjs': { name: 'SolidJS', color: 'bg-blue-600', icon: 'S', textColor: 'text-white', image: null },
+    'qwik': { name: 'Qwik', color: 'bg-purple-600', icon: 'Q', textColor: 'text-white', image: null },
     'tauri': { name: 'Tauri', color: 'bg-gray-800', icon: 'T', textColor: 'text-white', image: tauriIcon },
-    'nodejs': { name: 'Node.js', color: 'bg-white', icon: 'N', textColor: 'text-green-500', image: nodejsIcon },
+    'electron': { name: 'Electron', color: 'bg-blue-600', icon: 'E', textColor: 'text-white', image: null },
+    'nodejs': { name: 'Node.js', color: 'bg-card', icon: 'N', textColor: 'text-green-500', image: nodejsIcon },
 
     // Languages
     'typescript': { name: 'TypeScript', color: 'bg-[#3178c6]', icon: 'TS', textColor: 'text-white', image: typescriptIcon },
@@ -146,10 +152,15 @@ export const techIcons = {
     'ruby': { name: 'Ruby', color: 'bg-red-600', icon: 'R', textColor: 'text-white', image: rubyIcon },
     'swift': { name: 'Swift', color: 'bg-orange-500', icon: 'S', textColor: 'text-white', image: swiftIcon },
     'kotlin': { name: 'Kotlin', color: 'bg-purple-500', icon: 'K', textColor: 'text-white', image: kotlinIcon },
+    'dotnet': { name: '.NET', color: 'bg-purple-700', icon: '.N', textColor: 'text-white', image: null },
+    'aspnet': { name: 'ASP.NET', color: 'bg-purple-600', icon: 'ASP', textColor: 'text-white', image: null },
+    'elixir': { name: 'Elixir', color: 'bg-purple-700', icon: 'Ex', textColor: 'text-white', image: null },
+    'deno': { name: 'Deno', color: 'bg-gray-900', icon: 'D', textColor: 'text-white', image: null },
+    'android': { name: 'Android', color: 'bg-green-600', icon: '🤖', textColor: 'text-white', image: null },
 
     // Build Tools
     'vite': { name: 'Vite', color: 'bg-purple-50', icon: 'V', textColor: 'text-purple-600', image: viteIcon },
-    'npm': { name: 'npm', color: 'bg-white', icon: '📦', textColor: 'text-red-500', image: npmIcon },
+    'npm': { name: 'npm', color: 'bg-card', icon: '📦', textColor: 'text-red-500', image: npmIcon },
     'cargo': { name: 'Cargo', color: 'bg-orange-500', icon: '🦀', textColor: 'text-white', image: cargoIcon },
     'composer': { name: 'Composer', color: 'bg-purple-500', icon: '🎼', textColor: 'text-white', image: composerIcon },
     'pip': { name: 'pip', color: 'bg-blue-500', icon: '🐍', textColor: 'text-white', image: pipIcon },
@@ -161,13 +172,13 @@ export const techIcons = {
     'swc': { name: 'SWC', color: 'bg-orange-500', icon: 'S', textColor: 'text-white', image: swcIcon },
 
     // Styling
-    'tailwind': { name: 'Tailwind', color: 'bg-white', icon: '🌊', textColor: 'text-teal-400', image: tailwindIcon },
+    'tailwind': { name: 'Tailwind', color: 'bg-card', icon: '🌊', textColor: 'text-teal-400', image: tailwindIcon },
     'scss': { name: 'SCSS', color: 'bg-pink-500', icon: 'S', textColor: 'text-white', image: scssIcon },
     'css': { name: 'CSS', color: 'bg-blue-500', icon: 'C', textColor: 'text-white', image: cssIcon },
     'postcss': { name: 'PostCSS', color: 'bg-blue-500', icon: 'P', textColor: 'text-white', image: postcssIcon },
     'autoprefixer': { name: 'Autoprefixer', color: 'bg-pink-500', icon: 'A', textColor: 'text-white', image: autoprefixerIcon },
     'styled-components': { name: 'Styled Components', color: 'bg-pink-500', icon: '💅', textColor: 'text-white', image: styledcomponentsIcon },
-    'nativewind': { name: 'NativeWind', color: 'bg-white', icon: 'NW', textColor: 'text-blue-500', image: nativewindIcon },
+    'nativewind': { name: 'NativeWind', color: 'bg-card', icon: 'NW', textColor: 'text-blue-500', image: nativewindIcon },
 
     // UI Libraries
     'shadcn-ui': { name: 'shadcn/ui', color: 'bg-black', icon: 'UI', textColor: 'text-white', image: shadcnuiIcon },
@@ -183,8 +194,13 @@ export const techIcons = {
     'zustand': { name: 'Zustand', color: 'bg-gray-800', icon: '🐻', textColor: 'text-white', image: zustandIcon },
     'jotai': { name: 'Jotai', color: 'bg-gray-800', icon: 'J', textColor: 'text-white', image: jotaiIcon },
     'recoil': { name: 'Recoil', color: 'bg-blue-600', icon: 'R', textColor: 'text-white', image: recoilIcon },
+    'pinia': { name: 'Pinia', color: 'bg-yellow-400', icon: '🍍', textColor: 'text-black', image: null },
+    'mobx': { name: 'MobX', color: 'bg-orange-600', icon: 'MX', textColor: 'text-white', image: null },
     'tanstack-query': { name: 'TanStack Query', color: 'bg-red-500', icon: 'TQ', textColor: 'text-white', image: tanstackqueryIcon },
     'swr': { name: 'SWR', color: 'bg-black', icon: 'S', textColor: 'text-white', image: swrIcon },
+    // UI aliases (for detection keys)
+    'mui': { name: 'MUI', color: 'bg-blue-600', icon: 'M', textColor: 'text-white', image: materialuiIcon },
+    'antd': { name: 'Ant Design', color: 'bg-blue-500', icon: 'A', textColor: 'text-white', image: antdesignIcon },
 
     // Animations & Graphics
     'gsap': { name: 'GSAP', color: 'bg-green-600', icon: 'G', textColor: 'text-white', image: GsapIcon },
@@ -198,11 +214,26 @@ export const techIcons = {
 
     // Backend & API
     'express': { name: 'Express', color: 'bg-gray-700', icon: 'E', textColor: 'text-white', image: expressIcon },
-    'nestjs': { name: 'NestJS', color: 'bg-white', icon: 'N', textColor: 'text-red-600', image: nestjsIcon },
+    'nestjs': { name: 'NestJS', color: 'bg-card', icon: 'N', textColor: 'text-red-600', image: nestjsIcon },
     'fastapi': { name: 'FastAPI', color: 'bg-teal-500', icon: 'F', textColor: 'text-white', image: fastapiIcon },
+    'flask': { name: 'Flask', color: 'bg-gray-700', icon: 'Fl', textColor: 'text-white', image: pythonIcon },
     'django': { name: 'Django', color: 'bg-green-700', icon: 'D', textColor: 'text-white', image: djangoIcon },
     'laravel': { name: 'Laravel', color: 'bg-red-500', icon: 'L', textColor: 'text-white', image: laravelIcon },
+    'symfony': { name: 'Symfony', color: 'bg-gray-800', icon: 'S', textColor: 'text-white', image: phpIcon },
+    'wordpress': { name: 'WordPress', color: 'bg-blue-600', icon: 'WP', textColor: 'text-white', image: phpIcon },
     'spring': { name: 'Spring Boot', color: 'bg-green-500', icon: 'S', textColor: 'text-white', image: springIcon },
+    'rails': { name: 'Ruby on Rails', color: 'bg-red-700', icon: 'RoR', textColor: 'text-white', image: rubyIcon },
+    'sinatra': { name: 'Sinatra', color: 'bg-red-600', icon: 'S', textColor: 'text-white', image: rubyIcon },
+    'phoenix': { name: 'Phoenix', color: 'bg-orange-500', icon: 'Ph', textColor: 'text-white', image: null },
+    'fastify': { name: 'Fastify', color: 'bg-gray-800', icon: 'Fa', textColor: 'text-white', image: null },
+    'hono': { name: 'Hono', color: 'bg-orange-600', icon: 'H', textColor: 'text-white', image: null },
+    'elysia': { name: 'Elysia', color: 'bg-purple-600', icon: 'El', textColor: 'text-white', image: null },
+    'axum': { name: 'Axum', color: 'bg-orange-700', icon: 'Ax', textColor: 'text-white', image: rustIcon },
+    'actix': { name: 'Actix', color: 'bg-orange-600', icon: 'Ac', textColor: 'text-white', image: rustIcon },
+    'rocket': { name: 'Rocket', color: 'bg-red-500', icon: '🚀', textColor: 'text-white', image: rustIcon },
+    'gin': { name: 'Gin', color: 'bg-teal-600', icon: 'Gi', textColor: 'text-white', image: goIcon },
+    'fiber': { name: 'Fiber', color: 'bg-blue-600', icon: 'Fi', textColor: 'text-white', image: goIcon },
+    'echo': { name: 'Echo', color: 'bg-teal-500', icon: 'Ec', textColor: 'text-white', image: goIcon },
     'apollo': { name: 'Apollo', color: 'bg-purple-600', icon: 'A', textColor: 'text-white', image: apolloIcon },
     'trpc': { name: 'tRPC', color: 'bg-blue-500', icon: 'T', textColor: 'text-white', image: trpcIcon },
     'graphql': { name: 'GraphQL', color: 'bg-pink-500', icon: 'GQL', textColor: 'text-white', image: graphqlIcon },
@@ -225,23 +256,30 @@ export const techIcons = {
     'vercel': { name: 'Vercel', color: 'bg-black', icon: 'V', textColor: 'text-white', image: vercelIcon },
     'netlify': { name: 'Netlify', color: 'bg-cyan-500', icon: 'N', textColor: 'text-white', image: netlifyIcon },
     'cloudflare': { name: 'Cloudflare', color: 'bg-orange-400', icon: 'C', textColor: 'text-white', image: cloudflareIcon },
-    'supabase': { name: 'Supabase', color: 'bg-white', icon: 'S', textColor: 'text-green-600', image: supabase },
-    'firebase': { name: 'Firebase', color: 'bg-white', icon: 'F', textColor: 'text-yellow-500', image: firebase },
+    'supabase': { name: 'Supabase', color: 'bg-card', icon: 'S', textColor: 'text-green-600', image: supabase },
+    'firebase': { name: 'Firebase', color: 'bg-card', icon: 'F', textColor: 'text-yellow-500', image: firebase },
+    'convex': { name: 'Convex', color: 'bg-gray-900', icon: 'Cx', textColor: 'text-white', image: null },
+    'pocketbase': { name: 'PocketBase', color: 'bg-blue-600', icon: 'PB', textColor: 'text-white', image: null },
     'stripe': { name: 'Stripe', color: 'bg-indigo-500', icon: 'S', textColor: 'text-white', image: stripeIcon },
     'clerk': { name: 'Clerk', color: 'bg-purple-600', icon: 'C', textColor: 'text-white', image: clerkIcon },
+    'nextauth': { name: 'NextAuth', color: 'bg-gray-900', icon: 'NA', textColor: 'text-white', image: null },
+    'lucia': { name: 'Lucia', color: 'bg-gray-700', icon: 'Lu', textColor: 'text-white', image: null },
     'auth0': { name: 'Auth0', color: 'bg-orange-600', icon: 'A', textColor: 'text-white', image: auth0Icon },
     'strapi': { name: 'Strapi', color: 'bg-indigo-600', icon: 'S', textColor: 'text-white', image: strapiIcon },
     'sanity': { name: 'Sanity', color: 'bg-red-500', icon: 'S', textColor: 'text-white', image: sanityIcon },
+    'turborepo': { name: 'Turborepo', color: 'bg-gray-900', icon: '⚡', textColor: 'text-white', image: null },
+    'nx': { name: 'Nx', color: 'bg-blue-700', icon: 'Nx', textColor: 'text-white', image: null },
+    'webpack': { name: 'Webpack', color: 'bg-blue-500', icon: 'W', textColor: 'text-white', image: null },
 
     // Mobile
-    'react-native': { name: 'React Native', color: 'bg-white', icon: '⚛️', textColor: 'text-blue-400', image: reactIcon },
-    'expo': { name: 'Expo', color: 'bg-white', icon: 'E', textColor: 'text-purple-600', image: expoIcon },
+    'react-native': { name: 'React Native', color: 'bg-card', icon: '⚛️', textColor: 'text-blue-400', image: reactIcon },
+    'expo': { name: 'Expo', color: 'bg-card', icon: 'E', textColor: 'text-purple-600', image: expoIcon },
     'flutter': { name: 'Flutter', color: 'bg-blue-500', icon: 'F', textColor: 'text-white', image: flutterIcon },
     'ionic': { name: 'Ionic', color: 'bg-blue-500', icon: 'I', textColor: 'text-white', image: ionicIcon },
 
     // AI & ML
-    'openai': { name: 'OpenAI', color: 'bg-white', icon: 'AI', textColor: 'text-black', image: openaiIcon },
-    'langchain': { name: 'LangChain', color: 'bg-white', icon: '🦜', textColor: 'text-black', image: langchainIcon },
+    'openai': { name: 'OpenAI', color: 'bg-card', icon: 'AI', textColor: 'text-black', image: openaiIcon },
+    'langchain': { name: 'LangChain', color: 'bg-card', icon: '🦜', textColor: 'text-black', image: langchainIcon },
     'huggingface': { name: 'Hugging Face', color: 'bg-yellow-400', icon: '🤗', textColor: 'text-black', image: huggingfaceIcon },
     'tensorflow': { name: 'TensorFlow', color: 'bg-orange-500', icon: 'TF', textColor: 'text-white', image: tensorflowIcon },
     'pytorch': { name: 'PyTorch', color: 'bg-orange-600', icon: 'PT', textColor: 'text-white', image: pytorchIcon },
@@ -282,14 +320,14 @@ export const techIcons = {
 const brandCache = new Map();
 
 export const getTechIcon = (tech) => {
-    if (!tech) return { name: '?', color: 'bg-gray-500', icon: '?', textColor: 'text-gray-500', image: null }
+    if (!tech) return { name: '?', color: 'bg-gray-500', icon: '?', textColor: 'text-muted-foreground', image: null }
     const lower = tech.toLowerCase()
     const normalized = lower.replace(/\s+/g, '').replace(/\./g, '')
     return techIcons[normalized] || techIcons[lower] || {
         name: tech,
         color: 'bg-gray-500',
         icon: tech[0]?.toUpperCase() || '?',
-        textColor: 'text-gray-500',
+        textColor: 'text-muted-foreground',
         image: null
     }
 }

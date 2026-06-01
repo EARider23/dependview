@@ -5,7 +5,7 @@ import { Button } from './ui/button'
 export function UpdateFailureDialog({ open, onOpenChange, failedPackages = [], onRetry }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] bg-white border border-gray-100 shadow-xl">
+      <DialogContent className="sm:max-w-[480px] bg-card border border-border shadow-xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Update Failed</DialogTitle>
           <p className="text-sm text-gray-600 mt-1">Some packages failed to update.</p>

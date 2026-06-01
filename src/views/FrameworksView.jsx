@@ -57,7 +57,7 @@ const FrameworksView = ({ currentProject, showToast }) => {
               <img src={frameworkIcon} className="w-4 h-4 brightness-0 invert" alt="Framework" />
               {/* <Cpu className="w-4 h-4 text-white" /> */}
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-gray-900 flex items-center">
+            <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center">
               Global <span className="text-purple-600 ml-1">Runtimes</span>
             </h2>
             <motion.div
@@ -105,7 +105,7 @@ const FrameworksView = ({ currentProject, showToast }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
                 whileHover={{ y: -4 }}
-                className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm group hover:border-indigo-200 transition-all cursor-default relative overflow-hidden"
+                className="bg-card rounded-[2.5rem] border border-border p-8 shadow-sm group hover:border-indigo-200 transition-all cursor-default relative overflow-hidden"
               >
                 {/* Decorative background element */}
                 <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
@@ -114,7 +114,7 @@ const FrameworksView = ({ currentProject, showToast }) => {
 
                 <div className="flex justify-between items-start mb-8 relative z-10">
                   <motion.div
-                    className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-md border border-slate-50 p-3"
+                    className="w-16 h-16 rounded-2xl bg-card flex items-center justify-center shadow-md border border-slate-50 p-3"
                     whileHover={{ scale: 1.1, rotate: 5 }}
                   >
                     {techInfo.image ? (
@@ -131,7 +131,7 @@ const FrameworksView = ({ currentProject, showToast }) => {
                 </div>
 
                 <div className="relative z-10">
-                  <h4 className="font-black text-2xl text-slate-900 tracking-tight leading-none mb-2">{name}</h4>
+                  <h4 className="font-black text-2xl text-foreground tracking-tight leading-none mb-2">{name}</h4>
                   <div className="flex items-center gap-2 mb-8">
                     <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest font-mono">
                       {fw.version?.startsWith('v') ? fw.version : `v${fw.version}`}
@@ -148,7 +148,7 @@ const FrameworksView = ({ currentProject, showToast }) => {
                     />
                     Active Runtime
                   </div>
-                  <button className="flex items-center gap-1 text-[9px] font-black text-slate-300 hover:text-slate-900 transition-colors uppercase tracking-widest no-hover group/btn">
+                  <button className="flex items-center gap-1 text-[9px] font-black text-slate-300 hover:text-foreground transition-colors uppercase tracking-widest no-hover group/btn">
                     System Path
                     <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
                   </button>
@@ -159,19 +159,18 @@ const FrameworksView = ({ currentProject, showToast }) => {
         </div>
       ) : (
         <motion.div
-          className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 mb-12"
+          className="text-center py-32 bg-card rounded-[3rem] border-2 border-dashed border-border mb-12"
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
         >
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-md flex items-center justify-center mx-auto mb-6 border border-slate-50">
+          <div className="w-16 h-16 bg-card rounded-2xl shadow-md flex items-center justify-center mx-auto mb-6 border border-slate-50">
             <Cpu className="w-8 h-8 text-slate-200" />
           </div>
-          <h3 className="text-xl font-black text-slate-900 mb-2">Runtime Detection Required</h3>
+          <h3 className="text-xl font-black text-foreground mb-2">Runtime Detection Required</h3>
           <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Scan your local system to identify runtimes</p>
         </motion.div>
       )}
 
-      <Toaster position="bottom-right" richColors theme="dark" />
     </div>
   )
 }

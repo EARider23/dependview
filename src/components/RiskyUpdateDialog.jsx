@@ -25,7 +25,7 @@ export function RiskyUpdateDialog({ open, onOpenChange, riskyUpdate, onContinue,
           </div>
           <DialogDescription className="pt-4 space-y-3">
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="font-semibold text-gray-900 mb-1">
+              <p className="font-semibold text-foreground mb-1">
                 {riskyUpdate.packageName}
               </p>
               <p className="text-sm text-gray-600">

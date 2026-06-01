@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FolderOpen, Layers, Square, Menu, Zap, Box } from 'lucide-react'
@@ -39,8 +39,12 @@ const DashboardView = ({
   projectViewMode,
   setProjectViewMode,
   pickFolder,
-  removeProject
+  importFromPath,
+  removeProject,
+  showOnboarding
 }) => {
+
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const handleImportProject = async () => {
     const project = await pickFolder()
@@ -65,6 +69,45 @@ const DashboardView = ({
     }
   }, [projects.length])
 
+  // Tauri native folder drag-and-drop listener (Tauri v2 API)
+  useEffect(() => {
+    let unlisten = null
+    const setup = async () => {
+      try {
+        const { isTauri } = await import('../lib/browserMock')
+        if (!isTauri()) return
+
+        // Tauri v2: use Window.onDragDropEvent from @tauri-apps/api/window
+        const { getCurrentWindow } = await import('@tauri-apps/api/window')
+        const appWindow = getCurrentWindow()
+        unlisten = await appWindow.onDragDropEvent(async (event) => {
+          if (event.payload.type === 'hover') {
+            setIsDragOver(true)
+          } else if (event.payload.type === 'leave') {
+            setIsDragOver(false)
+          } else if (event.payload.type === 'drop') {
+            setIsDragOver(false)
+            const paths = event.payload.paths || []
+            if (paths.length === 0) return
+            const folderPath = paths[0]
+            if (importFromPath) {
+              const project = await importFromPath(folderPath)
+              if (project) {
+                setCurrentProject(project)
+                setViewMode('project')
+              }
+            }
+          }
+        })
+      } catch (e) {
+        // Not in Tauri or API unavailable — silent
+        console.warn('Drag-drop setup failed:', e)
+      }
+    }
+    setup()
+    return () => { if (typeof unlisten === 'function') unlisten() }
+  }, [importFromPath, setCurrentProject, setViewMode])
+
   const handleSelectProject = (p) => {
     setCurrentProject(p)
     setViewMode('project')
@@ -73,7 +116,15 @@ const DashboardView = ({
   const viewModes = ['grid', 'list', 'stack']
 
   return (
-    <div>
+    <motion.div
+      initial="hidden"
+      animate={showOnboarding ? "hidden" : "visible"}
+      variants={{
+        hidden: { opacity: 0, y: 40, filter: 'blur(12px)' },
+        visible: { opacity: 1, y: 0, filter: 'blur(0px)' }
+      }}
+      transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+    >
       {/* Title & Actions Section */}
       {/* Title & Actions Section */}
       <motion.div
@@ -87,7 +138,7 @@ const DashboardView = ({
             <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
               <Layers className="w-4 h-4 text-white" />
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-gray-900 flex items-center">
+            <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center">
               Project <span className="text-purple-600 ml-1">Manager</span>
             </h2>
             <motion.div
@@ -120,13 +171,13 @@ const DashboardView = ({
           <Button
             onClick={handleImportProject}
             size="lg"
-            className="flex-1 md:flex-none h-11 px-6 bg-white text-gray-900 border border-gray-100 shadow-sm rounded-xl transition-all active:scale-95 font-bold no-hover hover:border-gray-200 hover:bg-gray-50"
+            className="flex-1 md:flex-none h-11 px-6 bg-card text-foreground border border-border shadow-sm rounded-xl transition-all active:scale-95 font-bold no-hover hover:border-gray-200 hover:bg-muted"
           >
             <FolderOpen className="w-4 h-4 mr-2 text-gray-400" /> Import Project
           </Button>
 
           {/* View mode toggle */}
-          <div className="flex bg-gray-100/50 rounded-xl p-1 border border-gray-100 relative">
+          <div className="flex bg-gray-100/50 rounded-xl p-1 border border-border relative">
             {viewModes.map((mode) => (
               <button
                 key={mode}
@@ -140,7 +191,7 @@ const DashboardView = ({
                 {projectViewMode === mode && (
                   <motion.div
                     layoutId="viewModePill"
-                    className="absolute inset-0 bg-white shadow-sm border border-gray-100/50 rounded-lg"
+                    className="absolute inset-0 bg-card shadow-sm border border-border/50 rounded-lg"
                     transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                     style={{ zIndex: -1 }}
                   />
@@ -177,26 +228,34 @@ const DashboardView = ({
             {/* Minimal Drop Zone Container */}
             <motion.div
               onClick={pickFolder}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+              onDragLeave={() => setIsDragOver(false)}
               onDrop={(e) => {
                 e.preventDefault()
-                // Tauri handles file drops via window events usually, 
-                // but we'll stick to the click-to-pick for reliability 
-                // unless the user specifically asks for native tauri drop listener
-                pickFolder()
+                setIsDragOver(false)
+                // Native browser onDrop doesn't provide real FS paths — Tauri's
+                // 'tauri://drag-drop' event (set up above) handles the real drop.
+                // If we're not in Tauri (e.g. browser preview), fall back to dialog.
+                if (typeof window.__TAURI_INTERNALS__ === 'undefined') {
+                  pickFolder()
+                }
               }}
               className="relative group cursor-pointer"
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
             >
               {/* Animated Dashed Border */}
-              <div className="absolute inset-0 rounded-[3rem] border-2 border-dashed border-gray-200 group-hover:border-purple-400 group-hover:bg-purple-50/30 transition-all duration-500" />
+              <div className={`absolute inset-0 rounded-[3rem] border-2 border-dashed transition-all duration-500 ${
+                isDragOver
+                  ? 'border-purple-500 bg-purple-50/60 scale-[1.01]'
+                  : 'border-gray-200 group-hover:border-purple-400 group-hover:bg-purple-50/30'
+              }`} />
 
               {/* Inner Content */}
               <div className="relative z-10 flex flex-col items-center justify-center py-32 px-12 text-center">
                 {/* Floating Icon */}
                 <motion.div
-                  className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-10 border border-gray-100 group-hover:border-purple-200 transition-colors"
+                  className="w-24 h-24 bg-card rounded-3xl shadow-xl flex items-center justify-center mb-10 border border-border group-hover:border-purple-200 transition-colors"
                   animate={{ y: [0, -10, 0] }}
                   transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 >
@@ -213,7 +272,7 @@ const DashboardView = ({
                   </div>
                 </motion.div>
 
-                <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tighter">
+                <h2 className="text-4xl font-black text-foreground mb-3 tracking-tighter">
                   Import Your <span className="text-purple-600">Project</span>
                 </h2>
                 <p className="text-gray-400 font-bold text-[11px] uppercase tracking-[0.3em] mb-8">
@@ -221,7 +280,7 @@ const DashboardView = ({
                 </p>
 
                 <div className="flex flex-col items-center gap-2">
-                  <span className="px-4 py-2 bg-gray-100 rounded-full text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:bg-purple-100 group-hover:text-purple-700 transition-colors">
+                  <span className="px-4 py-2 bg-gray-100 rounded-full text-[10px] font-black text-muted-foreground uppercase tracking-widest group-hover:bg-purple-100 group-hover:text-purple-700 transition-colors">
                     Click or Drag Folder Here
                   </span>
                 </div>
@@ -313,8 +372,7 @@ const DashboardView = ({
           </div>
         )}
       </div>
-      <Toaster position="bottom-right" richColors theme="dark" />
-    </div>
+    </motion.div>
   )
 }
 

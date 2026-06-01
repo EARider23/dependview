@@ -42,7 +42,7 @@ export function UpdatePromptDialog({ open, onOpenChange, packageUpdates = [], fr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] bg-white max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] bg-card max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-full">
@@ -59,15 +59,15 @@ export function UpdatePromptDialog({ open, onOpenChange, packageUpdates = [], fr
           {/* Package Updates */}
           {packageUpdates.length > 0 && (
             <div>
-              <h3 className="text-lg font-bold mb-3 text-gray-900">Package Updates ({packageUpdates.length})</h3>
+              <h3 className="text-lg font-bold mb-3 text-foreground">Package Updates ({packageUpdates.length})</h3>
               <div className="space-y-2 max-h-48 overflow-auto">
                 {packageUpdates.map((pkg) => (
-                  <div key={pkg.name} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+                  <div key={pkg.name} className="flex items-center justify-between p-2 rounded hover:bg-muted">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Checkbox checked={selectedPackages.has(pkg.name)} onCheckedChange={() => togglePackage(pkg.name)} />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{pkg.name}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           {pkg.currentVersion} → {pkg.latestVersion}
                         </div>
                       </div>
@@ -82,15 +82,15 @@ export function UpdatePromptDialog({ open, onOpenChange, packageUpdates = [], fr
           {/* Framework/SDK Updates */}
           {frameworkUpdates.length > 0 && (
             <div>
-              <h3 className="text-lg font-bold mb-3 text-gray-900">Framework/SDK Updates ({frameworkUpdates.length})</h3>
+              <h3 className="text-lg font-bold mb-3 text-foreground">Framework/SDK Updates ({frameworkUpdates.length})</h3>
               <div className="space-y-2 max-h-48 overflow-auto">
                 {frameworkUpdates.map((fw) => (
-                  <div key={fw.name} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+                  <div key={fw.name} className="flex items-center justify-between p-2 rounded hover:bg-muted">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Checkbox checked={selectedFrameworks.has(fw.name)} onCheckedChange={() => toggleFramework(fw.name)} />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{fw.name}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           Current: {fw.currentVersion} • Latest: {fw.latestVersion}
                         </div>
                       </div>

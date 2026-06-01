@@ -11,7 +11,7 @@ export function UninstallProjectDialog({ open, onOpenChange, project, onConfirm 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] bg-white border border-gray-100 shadow-xl">
+            <DialogContent className="sm:max-w-[500px] bg-card border border-border shadow-xl">
                 <DialogHeader>
                     <div className="flex items-center gap-3">
                         <div className="p-3 bg-red-100 rounded-full">

@@ -33,8 +33,8 @@ const MaintenanceView = ({
     >
       <div className="flex justify-between items-end mb-10">
         <div>
-          <h2 className="text-4xl font-black mb-3 text-gray-900 tracking-tight">Smart <span className="text-purple-600">Maintenance</span> Hub</h2>
-          <p className="text-gray-500 font-medium text-lg italic">Optimize system performance and reclaim storage space</p>
+          <h2 className="text-4xl font-black mb-3 text-foreground tracking-tight">Smart <span className="text-purple-600">Maintenance</span> Hub</h2>
+          <p className="text-muted-foreground font-medium text-lg italic">Optimize system performance and reclaim storage space</p>
         </div>
         <Button
           onClick={runMaintenance}
@@ -55,19 +55,19 @@ const MaintenanceView = ({
       </div>
 
       {!maintenanceResult ? (
-        <div className="text-center py-32 bg-white/40 backdrop-blur-xl rounded-[3rem] border border-white/60 shadow-2xl relative overflow-hidden group">
+        <div className="text-center py-32 bg-card/40 backdrop-blur-xl rounded-[3rem] border border-white/60 shadow-2xl relative overflow-hidden group">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 blur-[100px] rounded-full pointer-events-none" />
-          <div className="w-24 h-24 bg-white rounded-[2rem] shadow-xl flex items-center justify-center mx-auto mb-8 border border-purple-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
+          <div className="w-24 h-24 bg-card rounded-[2rem] shadow-xl flex items-center justify-center mx-auto mb-8 border border-purple-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
             <Zap className="w-10 h-10 text-purple-600" />
           </div>
-          <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Diagnostic Engine Ready</h3>
+          <h3 className="text-2xl font-black text-foreground mb-2 relative z-10">Diagnostic Engine Ready</h3>
           <p className="text-gray-400 max-w-sm mx-auto font-medium relative z-10">Scan your workspace to find unused dependencies and clear redundant system caches.</p>
         </div>
       ) : (
         <>
           {/* Maintenance Dashboard */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <div className="bg-white/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl">
+            <div className="bg-card/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl">
               <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6 shadow-inner">
                 <HardDrive className="w-6 h-6" />
               </div>
@@ -78,7 +78,7 @@ const MaintenanceView = ({
               </div>
             </div>
 
-            <div className="bg-white/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl">
+            <div className="bg-card/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl">
               <div className="w-12 h-12 rounded-2xl bg-pink-50 text-pink-600 flex items-center justify-center mb-6 shadow-inner">
                 <History className="w-6 h-6" />
               </div>
@@ -88,7 +88,7 @@ const MaintenanceView = ({
               </div>
             </div>
 
-            <div className="bg-white/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl">
+            <div className="bg-card/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl">
               <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-6 shadow-inner">
                 <Zap className="w-6 h-6" />
               </div>
@@ -121,13 +121,13 @@ const MaintenanceView = ({
               </div>
               <div className="space-y-4">
                 {maintenanceResult.caches.map((cache, i) => (
-                  <div key={i} className="bg-white/60 backdrop-blur-xl rounded-3xl p-6 border border-white/40 flex items-center justify-between group hover:bg-white/80 transition-all">
+                  <div key={i} className="bg-card/60 backdrop-blur-xl rounded-3xl p-6 border border-white/40 flex items-center justify-between group hover:bg-card/80 transition-all">
                     <div className="flex items-center gap-5">
                       <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
                         <Package className="w-7 h-7" />
                       </div>
                       <div>
-                        <h4 className="font-black text-lg text-gray-900">{cache.name}</h4>
+                        <h4 className="font-black text-lg text-foreground">{cache.name}</h4>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">{formatBytes(cache.size)}</span>
                           <span className="w-1 h-1 rounded-full bg-gray-300" />
@@ -163,13 +163,13 @@ const MaintenanceView = ({
                   </div>
                 ) : (
                   maintenanceResult.unused_packages.map((pkg, i) => (
-                    <div key={i} className="bg-white rounded-3xl p-6 border border-gray-100 flex items-center justify-between hover:border-pink-200 transition-all group">
+                    <div key={i} className="bg-card rounded-3xl p-6 border border-border flex items-center justify-between hover:border-pink-200 transition-all group">
                       <div className="flex items-center gap-5">
                         <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-pink-600 shadow-inner group-hover:scale-110 transition-transform">
                           <Package className="w-6 h-6" />
                         </div>
                         <div>
-                          <h4 className="font-black text-gray-900">{pkg.name}</h4>
+                          <h4 className="font-black text-foreground">{pkg.name}</h4>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[9px] uppercase font-black tracking-tighter border-pink-100 text-pink-500">{pkg.project_name}</Badge>
                             <span className="text-[10px] text-gray-400 font-medium italic">Not imported in source</span>

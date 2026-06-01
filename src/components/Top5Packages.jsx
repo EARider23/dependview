@@ -25,7 +25,7 @@ const Top5Packages = ({ topPackages, scanResult, formatBytes }) => {
   }, { scope: containerRef, dependencies: [topPackages], revertOnUpdate: true });
 
   return (
-    <div ref={containerRef} className="bg-white/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/40 shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group mb-10">
+    <div ref={containerRef} className="bg-card/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/40 shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group mb-10">
       {/* Background Decor */}
       <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
         <TrendingUp size={100} />
@@ -49,7 +49,7 @@ const Top5Packages = ({ topPackages, scanResult, formatBytes }) => {
           const percentage = (pkg.size / maxVal) * 100;
 
           return (
-            <div key={i} className="top-5-item opacity-0 relative overflow-hidden bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 hover:border-purple-300 transition-all hover:bg-white/80 hover:shadow-2xl group/item">
+            <div key={i} className="top-5-item opacity-0 relative overflow-hidden bg-card/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 hover:border-purple-300 transition-all hover:bg-card/80 hover:shadow-2xl group/item">
               {/* Animated Background Bar - Glassmorphic style */}
               <div
                 className="size-bar absolute left-0 top-0 bottom-0 bg-purple-500/[0.03] group-hover/item:bg-purple-500/[0.07] transition-all duration-700 rounded-r-2xl"
@@ -58,11 +58,11 @@ const Top5Packages = ({ topPackages, scanResult, formatBytes }) => {
 
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center font-black text-xs text-gray-500 shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-card border border-gray-200 shadow-sm flex items-center justify-center font-black text-xs text-muted-foreground shrink-0">
                     {i + 1}
                   </div>
                   <div className="min-w-0">
-                    <span className="font-bold text-gray-900 block truncate pr-4">{pkg.name}</span>
+                    <span className="font-bold text-foreground block truncate pr-4">{pkg.name}</span>
                     <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Rank {i + 1}</span>
                   </div>
                 </div>
@@ -82,7 +82,7 @@ const Top5Packages = ({ topPackages, scanResult, formatBytes }) => {
         {topPackages.length === 0 && (
           <div className="space-y-3 opacity-50">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-gray-50 rounded-2xl h-16 w-full animate-pulse border border-gray-100" />
+              <div key={i} className="bg-muted rounded-2xl h-16 w-full animate-pulse border border-border" />
             ))}
           </div>
         )}

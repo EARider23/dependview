@@ -7,12 +7,19 @@ import { motion } from 'framer-motion'
 import { gsap } from 'gsap'
 
 const _isTauri = isTauri()
-let convertFileSrc = mockConvertFileSrc
+let globalConvertFileSrc = mockConvertFileSrc
 if (_isTauri) {
-    import('@tauri-apps/api/core').then(m => { convertFileSrc = m.convertFileSrc })
+    import('@tauri-apps/api/core').then(m => { globalConvertFileSrc = m.convertFileSrc })
 }
 
 export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isTop = false }) {
+    const [cfs, setCfs] = React.useState(() => globalConvertFileSrc)
+    React.useEffect(() => {
+        if (_isTauri && cfs === mockConvertFileSrc) {
+            import('@tauri-apps/api/core').then(m => setCfs(() => m.convertFileSrc))
+        }
+    }, [cfs])
+
     const techStack = project.technologies || []
     const normPath = (p) => (p || '').replace(/\\/g, '/')
     const folderName = normPath(project.path).split('/').pop()
@@ -61,14 +68,14 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
                 onClick={onClick}
-                className="group relative rounded-[1.5rem] glass-card shimmer-hover hover:bg-white/60 transition-all duration-300 cursor-pointer overflow-hidden flex items-center gap-4 p-3"
+                className="group relative rounded-[1.5rem] glass-card shimmer-hover hover:bg-card/60 transition-all duration-300 cursor-pointer overflow-hidden flex items-center gap-4 p-3"
             >
                 <div className="relative shrink-0">
                     <div ref={logoRef} className="w-12 h-12 rounded-[1rem] bg-indigo-50 shadow-sm flex items-center justify-center text-indigo-500 border-2 border-white/40 overflow-hidden group-hover:scale-105 transition-transform">
                         {project.image ? (
                             <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
                         ) : project.logo ? (
-                            <img src={convertFileSrc(project.logo)} alt={project.name} className="w-full h-full object-cover" />
+                            <img src={cfs(project.logo)} alt={project.name} className="w-full h-full object-cover" />
                         ) : (
                             <div className="font-black text-xl">
                                 {project.name?.charAt(0).toUpperCase() || 'P'}
@@ -87,23 +94,23 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                                 {project.technologies?.slice(0, 1).join(' • ') || 'WORKSPACE'}
                             </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                             {/* Package Manager Tag */}
-                            <div className="flex items-center gap-1 text-gray-500 bg-white/40 px-2 py-0.5 rounded-md border border-white/50 shadow-sm">
+                            <div className="flex items-center gap-1 text-muted-foreground bg-card/40 px-2 py-0.5 rounded-md border border-white/50 shadow-sm">
                                 <div className="w-1 h-1 rounded-full bg-emerald-400"></div>
                                 <span className="text-[9px] font-bold uppercase tracking-wider">{project.manager || 'npm'}</span>
                             </div>
 
                             {/* Folder Path & Open Button */}
-                            <div className="flex items-center gap-1 text-gray-500 bg-white/40 pl-2 pr-0.5 py-0.5 rounded-md border border-white/50 shadow-sm max-w-[150px]">
+                            <div className="flex items-center gap-1 text-muted-foreground bg-card/40 pl-2 pr-0.5 py-0.5 rounded-md border border-white/50 shadow-sm max-w-[150px]">
                                 <Folder className="w-3 h-3 text-purple-400 shrink-0" />
                                 <span className="text-[9px] font-mono truncate" title={normPath(project.path)}>
                                     {folderName || '...'}
                                 </span>
-                                <button 
+                                <button
                                     onClick={(e) => { e.stopPropagation(); /* TODO Implement open project location */ }}
-                                    className="w-5 h-5 ml-1 rounded bg-white hover:bg-purple-50 flex items-center justify-center text-purple-500 hover:text-purple-600 transition-colors shadow-sm shrink-0 border border-purple-100/30"
+                                    className="w-5 h-5 ml-1 rounded bg-card hover:bg-purple-50 flex items-center justify-center text-purple-500 hover:text-purple-600 transition-colors shadow-sm shrink-0 border border-purple-100/30"
                                     title="Open Location"
                                 >
                                     <ExternalLink className="w-3 h-3" />
@@ -116,7 +123,7 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                         <button
                             title="Remove Project"
                             onClick={(e) => { e.stopPropagation(); onRemove && onRemove(project.path); }}
-                            className="w-8 h-8 rounded-lg bg-white/40 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all border border-transparent hover:border-red-100 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 no-hover"
+                            className="w-8 h-8 rounded-lg bg-card/40 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all border border-transparent hover:border-red-100 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 no-hover"
                         >
                             <FolderMinus className="w-4 h-4" />
                         </button>
@@ -128,8 +135,8 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
 
     if (viewMode === 'stack') {
         return (
-            <div className={`w-full h-full rounded-[2.5rem] flex flex-col p-5 relative group overflow-hidden transition-all duration-500 bg-white/95 backdrop-blur-2xl border-2 shimmer-hover ${isTop ? 'shadow-[0_30px_60px_-15px_rgba(147,51,234,0.4)] border-purple-200/80 scale-100 z-10' : 'scale-[0.98] opacity-95 border-purple-100/40 shadow-xl'}`}>
-                
+            <div className={`w-full h-full rounded-[2.5rem] flex flex-col p-5 relative group overflow-hidden transition-all duration-500 bg-card backdrop-blur-none border-2 shimmer-hover ${isTop ? 'shadow-[0_30px_60px_-15px_rgba(147,51,234,0.4)] border-purple-200/80 scale-100 z-10' : 'scale-[0.98] border-purple-100/40 shadow-xl'}`}>
+
                 {/* Decorative Background Glows */}
                 <div className="absolute -top-16 -right-16 w-56 h-56 bg-purple-400/20 rounded-full blur-[60px] pointer-events-none" />
                 <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-yellow-400/10 rounded-full blur-[60px] pointer-events-none" />
@@ -138,12 +145,12 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 <div className="flex justify-between items-center w-full z-10 relative px-1">
                     <button
                         onClick={(e) => { e.stopPropagation(); onRemove && onRemove(project.path); }}
-                        className="w-9 h-9 rounded-xl bg-white/40 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-all border border-transparent hover:border-red-100 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 no-hover"
+                        className="w-9 h-9 rounded-xl bg-card/40 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-all border border-transparent hover:border-red-100 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 no-hover"
                         title="Remove project from PEEAK"
                     >
                         <FolderMinus className="w-4 h-4" />
                     </button>
-                    <div className="flex items-center gap-1.5 text-gray-400 font-bold bg-white/30 px-2.5 py-1 rounded-lg border border-white/50 backdrop-blur-md shadow-sm">
+                    <div className="flex items-center gap-1.5 text-gray-400 font-bold bg-card/30 px-2.5 py-1 rounded-lg border border-white/50 backdrop-blur-md shadow-sm">
                         <Calendar className="w-3 h-3" />
                         <span className="text-[8px] uppercase tracking-widest">
                             {project.lastScanned ? new Date(project.lastScanned).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase() : 'NO DATE'}
@@ -152,13 +159,13 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 </div>
 
                 {/* Center Content: Logo & Title */}
-                <div className="flex-1 flex flex-col items-center justify-center relative z-10 mt-1">
+                <div className="flex-1 flex flex-col items-center justify-center relative z-10 mt-1 w-full min-w-0">
                     <div className="relative mb-4 group-hover:-translate-y-1.5 transition-transform duration-500">
                         <div className="w-28 h-28 rounded-[2rem] bg-indigo-50 shadow-xl flex items-center justify-center text-indigo-500 overflow-hidden border-[4px] border-white/60">
                             {project.image ? (
                                 <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
                             ) : project.logo ? (
-                                <img src={convertFileSrc(project.logo)} alt={project.name} className="w-full h-full object-cover" />
+                                <img src={cfs(project.logo)} alt={project.name} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="font-black text-5xl">
                                     {project.name?.charAt(0).toUpperCase() || 'P'}
@@ -167,14 +174,14 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                         </div>
                         {/* Status dot */}
                         <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 bg-green-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center">
-                           <Zap className="w-3.5 h-3.5 text-white" />
+                            <Zap className="w-3.5 h-3.5 text-white" />
                         </div>
                     </div>
 
-                    <h3 className="font-black text-[1.75rem] text-transparent bg-clip-text bg-gradient-to-br from-purple-600 to-purple-400 tracking-tight mb-2 text-center px-1 leading-tight line-clamp-2 min-h-[60px] flex items-center justify-center">
+                    <h3 className="font-black text-[1.75rem] text-transparent bg-clip-text bg-gradient-to-br from-purple-600 to-purple-400 tracking-tight mb-2 text-center px-4 leading-tight truncate w-full" title={project.name}>
                         {project.name}
                     </h3>
-                    
+
                     <div className="flex flex-wrap justify-center gap-1.5 mb-2 w-full px-2">
                         {project.technologies && project.technologies.length > 0 ? (
                             project.technologies.slice(0, 3).map((tech, i) => (
@@ -191,8 +198,8 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 </div>
 
                 {/* Bottom Bar: Sleek Unified Pill */}
-                <div className="flex items-center justify-between w-full bg-white/70 backdrop-blur-xl rounded-[1.25rem] p-1.5 border border-white shadow-sm relative z-10 mt-auto">
-                    
+                <div className="flex items-center justify-between w-full bg-card/70 backdrop-blur-xl rounded-[1.25rem] p-1.5 border border-white shadow-sm relative z-10 mt-auto">
+
                     {/* Info Group */}
                     <div className="flex items-center gap-2.5 pl-2.5 overflow-hidden">
                         {/* Manager Dot with Pulse */}
@@ -201,7 +208,7 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                             </span>
-                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{project.manager || 'npm'}</span>
+                            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{project.manager || 'npm'}</span>
                         </div>
 
                         {/* Subtle Divider */}
@@ -218,16 +225,16 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
 
                     {/* Actions Group */}
                     <div className="flex items-center gap-1 shrink-0">
-                        <button 
+                        <button
                             onClick={(e) => { e.stopPropagation(); /* TODO Implement open project location */ }}
-                            className="w-8 h-8 rounded-[0.8rem] bg-transparent hover:bg-white flex items-center justify-center text-gray-400 hover:text-purple-600 transition-colors shrink-0 no-hover"
+                            className="w-8 h-8 rounded-[0.8rem] bg-transparent hover:bg-card flex items-center justify-center text-gray-400 hover:text-purple-600 transition-colors shrink-0 no-hover"
                             title="Open Location"
                         >
                             <ExternalLink className="w-3.5 h-3.5" />
                         </button>
 
-                        <motion.button 
-                            onClick={onClick} 
+                        <motion.button
+                            onClick={onClick}
                             className="w-10 h-10 rounded-[0.9rem] bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20 no-hover"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -248,13 +255,13 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onClick={onClick}
-            className="group relative w-full rounded-[2.5rem] glass-card shimmer-hover p-6 hover:bg-white/60 transition-all duration-500 cursor-pointer flex flex-col items-center text-center min-h-[300px]"
+            className="group relative w-full rounded-[2.5rem] glass-card shimmer-hover p-6 hover:bg-card/60 transition-all duration-500 cursor-pointer flex flex-col items-center text-center min-h-[300px]"
         >
             {/* Remove Action (Top Right) */}
             <div className="absolute top-5 right-5 z-10">
                 <button
                     onClick={(e) => { e.stopPropagation(); onRemove && onRemove(project.path); }}
-                    className="w-8 h-8 rounded-xl bg-white/40 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-all border border-transparent hover:border-red-100 flex items-center justify-center shadow-sm no-hover"
+                    className="w-8 h-8 rounded-xl bg-card/40 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-all border border-transparent hover:border-red-100 flex items-center justify-center shadow-sm no-hover"
                     title="Remove project from PEEAK"
                 >
                     <FolderMinus className="w-4 h-4" />
@@ -267,7 +274,7 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                     {project.image ? (
                         <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
                     ) : project.logo ? (
-                        <img src={convertFileSrc(project.logo)} alt={project.name} className="w-full h-full object-cover" />
+                        <img src={cfs(project.logo)} alt={project.name} className="w-full h-full object-cover" />
                     ) : (
                         <div className="font-black text-3xl">
                             {project.name?.charAt(0).toUpperCase() || 'P'}
@@ -281,13 +288,13 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 <h3 className="font-black text-[22px] text-purple-600 tracking-tight leading-tight mb-2 truncate w-full px-2">
                     {project.name}
                 </h3>
-                
+
                 {/* Tech Stack & Status */}
                 <div className="flex flex-wrap items-center justify-center gap-1.5 mb-4 w-full">
-                    <motion.div 
-                      className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" 
-                      animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    <motion.div
+                        className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"
+                        animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                     />
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest truncate">
                         {project.technologies?.slice(0, 2).join(' • ') || 'WORKSPACE'}
@@ -297,21 +304,21 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
                 {/* Developer Details */}
                 <div className="flex items-center justify-center gap-3 w-full mb-6">
                     {/* Package Manager Tag */}
-                    <div className="flex items-center gap-1.5 text-gray-500 bg-white/40 px-2.5 py-1.5 rounded-lg border border-white/50 shadow-sm" title="Package Manager">
+                    <div className="flex items-center gap-1.5 text-muted-foreground bg-card/40 px-2.5 py-1.5 rounded-lg border border-white/50 shadow-sm" title="Package Manager">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
                         <span className="text-[10px] font-bold uppercase tracking-wider">{project.manager || 'npm'}</span>
                     </div>
 
                     {/* Folder Path & Open Button */}
-                    <div className="flex items-center gap-1.5 text-gray-500 bg-white/40 pl-2.5 pr-1 py-1 rounded-lg border border-white/50 shadow-sm max-w-[150px]">
+                    <div className="flex items-center gap-1.5 text-muted-foreground bg-card/40 pl-2.5 pr-1 py-1 rounded-lg border border-white/50 shadow-sm max-w-[150px]">
                         <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                         <span className="text-[10px] font-mono truncate" title={normPath(project.path)}>
                             {folderName || '...'}
                         </span>
                         {/* Simple Open Location Button */}
-                        <button 
+                        <button
                             onClick={(e) => { e.stopPropagation(); /* TODO Implement open project location */ }}
-                            className="w-6 h-6 ml-1 rounded-md bg-white hover:bg-purple-50 flex items-center justify-center text-purple-500 hover:text-purple-600 transition-colors shadow-sm shrink-0 border border-purple-100/30"
+                            className="w-6 h-6 ml-1 rounded-md bg-card hover:bg-purple-50 flex items-center justify-center text-purple-500 hover:text-purple-600 transition-colors shadow-sm shrink-0 border border-purple-100/30"
                             title="Open Location"
                         >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -321,10 +328,10 @@ export function ProjectCard({ project, onClick, onRemove, viewMode = 'grid', isT
 
                 {/* Date Footer */}
                 <div className="mt-auto w-full flex items-center justify-between pt-1">
-                    <div className="bg-purple-50 px-2 py-1 rounded-md border border-purple-100/50">
-                        <span className="text-[8px] font-black text-purple-600 uppercase tracking-widest">MASTER</span>
+                    <div className="bg-purple-50 px-1.5 h-4 flex items-center justify-center rounded-md border border-purple-100/50">
+                        <span className="text-[7px] font-black text-purple-600 uppercase tracking-widest">MASTER</span>
                     </div>
-                    
+
                     <div className="flex items-center gap-1.5 text-gray-400 font-bold">
                         <Calendar className="w-3 h-3" />
                         <span className="text-[8px] uppercase tracking-widest">

@@ -143,7 +143,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
     pip: { label: 'Python (pip)', color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100', icon: 'P', tech: 'python' },
     cargo: { label: 'Rust (cargo)', color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-100', icon: 'C', tech: 'rust' },
     gem: { label: 'Ruby (gem)', color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-100', icon: 'G', tech: 'ruby' },
-    unknown: { label: 'System Other', color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-100', icon: '?', tech: 'package' },
+    unknown: { label: 'System Other', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border', icon: '?', tech: 'package' },
   }
 
   return (
@@ -161,7 +161,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
               <img src={systemIcon} className="w-4 h-4 brightness-0 invert" alt="System" />
               {/* <Layers className="w-4 h-4 text-white" /> */}
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-gray-900 flex items-center">
+            <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center">
               Global <span className="text-purple-600 ml-1">Packages</span>
             </h2>
             <motion.div
@@ -191,168 +191,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
         </div>
       </motion.div>
 
-      {/* NEW: Tactical Obsidian Registry Intelligence Engine */}
-      <motion.div
-        className="mb-12 relative"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <div className="absolute inset-0 bg-slate-950 rounded-[3.5rem] overflow-hidden">
-          {/* Tactical Grid Overlay */}
-          <div className="absolute inset-0 opacity-[0.05] pointer-events-none" 
-               style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
-          
-          {/* Cyan Glow Pulse */}
-          <motion.div 
-            className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/4"
-            animate={{ opacity: [0.5, 0.8, 0.5] }}
-            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
 
-        <div className="relative z-10 p-10 lg:p-12">
-          {/* Engine Header */}
-          <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.15)]">
-                <Box className="w-7 h-7 text-cyan-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-xl font-black text-white uppercase tracking-tight">Registry Intelligence Engine</h3>
-                  <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 text-[8px] font-black tracking-widest px-1.5 py-0.5 uppercase">v4.0.2_PRO</Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Global Nexus Protocol Active</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-8 text-[10px] font-black uppercase tracking-widest text-slate-500 font-mono">
-              <div className="flex flex-col items-end">
-                <span className="text-slate-600">Sync Status</span>
-                <span className="text-cyan-400">Synchronized</span>
-              </div>
-              <div className="w-[1px] h-8 bg-slate-800" />
-              <div className="flex flex-col items-end">
-                <span className="text-slate-600">Endpoint</span>
-                <span className="text-white">API.GLOBAL_REGISTRY</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Industrial Search Bar */}
-          <div className="max-w-4xl mx-auto mb-10">
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 p-2 rounded-2xl flex gap-2 shadow-2xl focus-within:border-cyan-500/50 transition-colors">
-              <div className="relative flex-1 group">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600 group-focus-within:text-cyan-400 transition-colors" />
-                <Input
-                  placeholder="QUERY REGISTRY (NPM, PYPI, CARGO...)"
-                  value={engineQuery}
-                  onChange={(e) => setEngineQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && engineQuery && searchPackages(frameworks[0]?.package_manager || 'npm')}
-                  className="pl-16 h-14 bg-transparent border-none focus:ring-0 text-white font-mono text-sm placeholder:text-slate-600 uppercase tracking-widest"
-                />
-              </div>
-              <Button
-                onClick={() => searchPackages(frameworks[0]?.package_manager || 'npm')}
-                disabled={systemBusy || !engineQuery}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white h-14 px-10 rounded-xl font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-[0_0_30px_rgba(6,182,212,0.2)] active:scale-95 disabled:opacity-20"
-              >
-                {systemBusy ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Run Query"}
-              </Button>
-            </div>
-          </div>
-
-          {/* Results Grid - Command Line Style */}
-          <AnimatePresence mode="wait">
-            {searchResults && searchResults.length > 0 ? (
-              <motion.div
-                key="results"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                {searchResults.map((pkg, i) => {
-                  const installState = installingPackages.get(pkg.name);
-                  const isInstalling = !!installState;
-
-                  return (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.03 }}
-                      className={`bg-slate-900/40 border ${isInstalling ? 'border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.1)]' : 'border-slate-800'} rounded-2xl p-5 hover:border-cyan-500/30 transition-all group/pkg relative overflow-hidden`}
-                    >
-                      {/* Installation Progress Overlay */}
-                      {isInstalling && (
-                        <motion.div 
-                          className="absolute bottom-0 left-0 h-1 bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)] z-20"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${installState.progress}%` }}
-                        />
-                      )}
-
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-black text-white tracking-tight truncate mb-1">{pkg.name}</h4>
-                          <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest block font-mono">
-                            {isInstalling ? (
-                              <span className="text-cyan-400 animate-pulse">DEPLOYING {installState.progress}%</span>
-                            ) : `v${pkg.version}`}
-                          </span>
-                        </div>
-                        <button
-                          disabled={isInstalling}
-                          onClick={() => installPackage(frameworks[0]?.package_manager || 'npm', pkg.name, null)}
-                          className={`w-10 h-10 rounded-xl ${isInstalling ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-cyan-600 hover:text-white'} flex items-center justify-center transition-all active:scale-90 shadow-sm border border-slate-700/50 hover:border-cyan-400`}
-                        >
-                          {isInstalling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        </button>
-                      </div>
-
-                      {isInstalling ? (
-                        <div className="mb-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest animate-pulse">
-                              {installState.throughput || 'Streaming Data...'}
-                            </span>
-                          </div>
-                          <p className="text-[9px] font-mono text-slate-400 truncate bg-slate-950/50 p-1.5 rounded-md border border-slate-800/50">
-                            {installState.lastLog || 'Initializing Protocol...'}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-slate-500 line-clamp-2 font-medium leading-relaxed mb-4 uppercase tracking-wider">
-                          {pkg.description || 'System metadata missing'}
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-800/50">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-1 h-1 rounded-full ${isInstalling ? 'bg-cyan-400 animate-ping' : 'bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]'}`} />
-                          <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                            {isInstalling ? 'Atomic Install Active' : 'Stable Release'}
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </motion.div>
-            ) : engineQuery && !systemBusy && (
-              <motion.div className="text-center py-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <Box className="w-10 h-10 text-slate-800 mx-auto mb-4" />
-                <p className="text-slate-600 font-black text-[10px] uppercase tracking-[0.3em]">No valid signatures found in registry</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.div>
 
 
       {/* Stats Bento Grid */}
@@ -366,7 +205,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
           {/* Main Stat Card */}
           <motion.div
             variants={staggerItem}
-            className="md:col-span-2 bg-white rounded-[2rem] p-6 border border-indigo-100 shadow-sm relative overflow-hidden group"
+            className="md:col-span-2 bg-card rounded-[2rem] p-6 border border-indigo-100 shadow-sm relative overflow-hidden group"
           >
             <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
               <Package className="w-32 h-32 rotate-12 text-purple-600" />
@@ -393,7 +232,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
           {/* Secondary Stats */}
           <motion.div
             variants={staggerItem}
-            className="bg-white rounded-[1.5rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-indigo-200 transition-all relative border-b-[2px] border-b-indigo-500/30 hover:border-b-indigo-500"
+            className="bg-card rounded-[1.5rem] p-5 border border-border shadow-sm flex flex-col justify-between group overflow-hidden hover:border-indigo-200 transition-all relative border-b-[2px] border-b-indigo-500/30 hover:border-b-indigo-500"
           >
             <div className="space-y-1.5">
               <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
@@ -410,7 +249,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
 
           <motion.div
             variants={staggerItem}
-            className="bg-white rounded-[1.5rem] p-5 border border-slate-100 shadow-sm flex flex-col justify-between group overflow-hidden hover:border-emerald-200 transition-all relative border-b-[2px] border-b-emerald-500/30 hover:border-b-emerald-500"
+            className="bg-card rounded-[1.5rem] p-5 border border-border shadow-sm flex flex-col justify-between group overflow-hidden hover:border-emerald-200 transition-all relative border-b-[2px] border-b-emerald-500/30 hover:border-b-emerald-500"
           >
             <div className="space-y-1.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
@@ -440,7 +279,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
             placeholder="Search global tools & packages..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-16 h-16 bg-white border border-slate-100 focus:border-purple-200 rounded-2xl text-[15px] font-bold shadow-sm font-sans placeholder:text-slate-300 transition-all"
+            className="pl-16 h-16 bg-card border border-border focus:border-purple-200 rounded-2xl text-[15px] font-bold shadow-sm font-sans placeholder:text-slate-300 transition-all"
           />
         </div>
       </motion.div>
@@ -479,7 +318,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
 
               {/* Main Radar Disc (Glass Floor) */}
               <div className="absolute inset-[-20%] rounded-full border-4 border-white/80 bg-gradient-to-b from-indigo-50/40 to-white/10 backdrop-blur-sm shadow-[0_20px_50px_rgba(99,102,241,0.1)] [transform:translateZ(-10px)]" />
-              <div className="absolute inset-0 rounded-full border-2 border-slate-200/50 [transform:translateZ(0px)]" />
+              <div className="absolute inset-0 rounded-full border-2 border-border/50 [transform:translateZ(0px)]" />
 
               {/* Rotating 3D Sweep */}
               <motion.div
@@ -519,14 +358,14 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
           </div>
 
           <div className="text-center space-y-2 relative z-10">
-            <h3 className="text-slate-900 font-black text-xl tracking-tight">Active Scan</h3>
+            <h3 className="text-foreground font-black text-xl tracking-tight">Active Scan</h3>
             <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.3em] animate-pulse">Inventorying Global Binaries...</p>
           </div>
         </div>
       ) : !systemResult ? (
-        <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+        <div className="text-center py-32 bg-card rounded-[3rem] border-2 border-dashed border-border">
           <Cpu className="w-12 h-12 text-slate-200 mx-auto mb-6" />
-          <h3 className="text-xl font-black text-slate-900 mb-2">Inventory Offline</h3>
+          <h3 className="text-xl font-black text-foreground mb-2">Inventory Offline</h3>
           <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Run scan to detect system environments</p>
         </div>
       ) : (
@@ -541,12 +380,12 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                 key={manager}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm overflow-hidden transition-all hover:border-purple-100"
+                className="bg-card rounded-[1.5rem] border border-border shadow-sm overflow-hidden transition-all hover:border-purple-100"
               >
                 {/* Manager Header Bar */}
                 <div
                   onClick={() => toggleManager(manager)}
-                  className="p-4 flex items-center justify-between cursor-pointer hover:bg-purple-50/30 transition-colors"
+                  className="group/hdr p-4 flex items-center justify-between cursor-pointer hover:bg-purple-50/30 transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl ${meta.bg} flex items-center justify-center p-2.5 shadow-inner`}>
@@ -557,7 +396,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                       )}
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1.5 flex items-center gap-2">
+                      <h3 className="text-2xl font-black text-foreground tracking-tight leading-none mb-1.5 flex items-center gap-2">
                         {meta.label}
                         <Badge className="bg-purple-50 text-purple-600 border-none font-black text-[9px] px-2 py-0.5 rounded-md uppercase tracking-widest">Live</Badge>
                       </h3>
@@ -578,26 +417,26 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <div className="hidden md:flex -space-x-3 overflow-hidden">
+                    <div className="hidden md:flex -space-x-3 px-2">
                       {pkgs.slice(0, 4).map((p, i) => {
                         const icon = getTechIcon(p.name);
                         const stackColors = [
-                          'bg-indigo-50',
-                          'bg-indigo-100',
-                          'bg-indigo-200',
-                          'bg-indigo-300'
+                          'bg-[#eef2ff] dark:bg-[#312e81]', // indigo-50 / indigo-900
+                          'bg-[#e0e7ff] dark:bg-[#3730a3]', // indigo-100 / indigo-800
+                          'bg-[#c7d2fe] dark:bg-[#4f46e5]', // indigo-200 / indigo-600
+                          'bg-[#a5b4fc] dark:bg-[#6366f1]'  // indigo-300 / indigo-500
                         ];
                         return (
-                          <div key={i} className={`inline-block h-8 w-8 rounded-full ring-4 ring-white ${stackColors[i] || 'bg-slate-50'} flex items-center justify-center border border-slate-100/50 shadow-sm`} />
+                          <div key={i} className={`inline-block h-8 w-8 rounded-full shadow-[0_0_0_4px_#ffffff] dark:shadow-[0_0_0_4px_#111113] dark:group-hover/hdr:shadow-[0_0_0_4px_#171020] ${stackColors[i] || 'bg-muted'} flex items-center justify-center`} />
                         )
                       })}
                       {pkgs.length > 4 && (
-                        <div className="inline-block h-8 w-8 rounded-full ring-4 ring-white bg-indigo-600 flex items-center justify-center text-[9px] font-black text-white shadow-lg z-10">
+                        <div className="inline-block h-8 w-8 rounded-full shadow-[0_0_0_4px_#ffffff] dark:shadow-[0_0_0_4px_#111113] dark:group-hover/hdr:shadow-[0_0_0_4px_#171020] bg-indigo-600 flex items-center justify-center text-[9px] font-black text-white z-10">
                           +{pkgs.length - 4}
                         </div>
                       )}
                     </div>
-                    <div className={`w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                    <div className={`w-10 h-10 rounded-xl bg-muted flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                       <ChevronDown className="w-5 h-5 text-slate-400" />
                     </div>
                   </div>
@@ -622,11 +461,11 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: i * 0.01 }}
-                                className="group relative p-5 bg-white border border-slate-100 rounded-[1.5rem] transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100 border-b-4 border-b-slate-100 hover:border-b-indigo-500 flex flex-col justify-between"
+                                className="group relative p-5 bg-card border border-border rounded-[1.5rem] transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100 border-b-4 border-b-slate-100 hover:border-b-indigo-500 flex flex-col justify-between"
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center p-2 border border-slate-100 group-hover:scale-110 transition-transform shadow-inner shrink-0">
+                                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center p-2 border border-border group-hover:scale-110 transition-transform shadow-inner shrink-0">
                                       {pkgIcon.image ? (
                                         <img src={pkgIcon.image} className="w-full h-full object-contain" />
                                       ) : (
@@ -634,7 +473,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                                       )}
                                     </div>
                                     <div className="min-w-0">
-                                      <h4 className="font-black text-slate-900 text-[14px] tracking-tight truncate leading-tight mb-1">{pkg.name}</h4>
+                                      <h4 className="font-black text-foreground text-[14px] tracking-tight truncate leading-tight mb-1">{pkg.name}</h4>
                                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{formatBytes(pkg.size)}</span>
                                     </div>
                                   </div>
@@ -642,7 +481,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                                     {recentGlobals.includes(pkg.name) && (
                                       <Badge className="bg-red-600 text-white border-none font-black text-[7px] px-1.5 py-0.5 rounded-sm uppercase tracking-widest shadow-sm">New</Badge>
                                     )}
-                                    <Badge variant="outline" className="bg-slate-50 text-slate-500 border-none font-mono text-[9px] px-2 py-0.5 rounded-md group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                    <Badge variant="outline" className="bg-muted text-muted-foreground border-none font-mono text-[9px] px-2 py-0.5 rounded-md group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                                       v{pkg.version}
                                     </Badge>
                                   </div>
@@ -655,7 +494,7 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
                                   </div>
                                   <button
                                     onClick={() => deletePackage(manager, pkg.name)}
-                                    className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-90"
+                                    className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-90"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -673,7 +512,168 @@ const SystemPackagesView = ({ showToast, formatBytes }) => {
           })}
         </div>
       )}
-      <Toaster position="bottom-right" richColors theme="dark" />
+
+      {/* NEW: Restyled Registry Intelligence Engine (Stealth Monochrome) */}
+      <AnimatePresence>
+        {systemResult && !busy && (
+          <motion.div
+            className="mt-12 mb-20 relative bg-card rounded-[2.5rem] p-10 border border-border shadow-sm overflow-hidden"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+          >
+            {/* Engine Header */}
+            <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center shadow-sm">
+                  <Box className="w-7 h-7 text-purple-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight font-sans">Registry Intelligence Engine</h3>
+                    <Badge className="bg-purple-600 text-white border-none text-[8px] font-black tracking-widest px-2 py-0.5 uppercase">v4.0.2_PRO</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Global Nexus Protocol Active</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-8 text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono">
+                <div className="flex flex-col items-end">
+                  <span className="text-slate-300">Sync Status</span>
+                  <span className="text-purple-600">Synchronized</span>
+                </div>
+                <div className="w-[1px] h-8 bg-slate-100" />
+                <div className="flex flex-col items-end">
+                  <span className="text-slate-300">Endpoint</span>
+                  <span className="text-foreground">API.GLOBAL_REGISTRY</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Industrial Search Bar */}
+            <div className="max-w-4xl mx-auto mb-10">
+              <div className="bg-muted border border-border p-2 rounded-2xl flex gap-2 shadow-sm focus-within:border-purple-200 transition-colors">
+                <div className="relative flex-1 group">
+                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-purple-600 transition-colors" />
+                  <Input
+                    placeholder="QUERY REGISTRY (NPM, PYPI, CARGO...)"
+                    value={engineQuery}
+                    onChange={(e) => setEngineQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && engineQuery && searchPackages(frameworks[0]?.package_manager || 'npm')}
+                    className="pl-16 h-14 bg-transparent border-none focus:ring-0 text-foreground font-sans font-bold text-sm placeholder:text-slate-300 uppercase tracking-widest"
+                  />
+                </div>
+                <Button
+                  onClick={() => searchPackages(frameworks[0]?.package_manager || 'npm')}
+                  disabled={systemBusy || !engineQuery}
+                  className="bg-purple-600 hover:bg-purple-700 text-white h-14 px-10 rounded-xl font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-lg shadow-purple-100 active:scale-95 disabled:opacity-20"
+                >
+                  {systemBusy ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Run Query"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Results Grid - Premium Cards Style */}
+            <AnimatePresence mode="wait">
+              {searchResults && searchResults.length > 0 ? (
+                <motion.div
+                  key="results"
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {searchResults.map((pkg, i) => {
+                    const installState = installingPackages.get(pkg.name);
+                    const isInstalling = !!installState;
+                    const pkgIcon = getPackageIcon(pkg.name);
+
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.03 }}
+                        className={`bg-card border ${isInstalling ? 'border-purple-500/50 shadow-lg shadow-purple-500/5' : 'border-border'} rounded-[1.5rem] p-5 hover:border-purple-200 transition-all group/pkg relative overflow-hidden`}
+                      >
+                        {/* Installation Progress Overlay */}
+                        {isInstalling && (
+                          <motion.div 
+                            className="absolute bottom-0 left-0 h-1 bg-purple-600 shadow-[0_0_10px_rgba(147,51,234,0.8)] z-20"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${installState.progress}%` }}
+                          />
+                        )}
+
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="min-w-0 flex-1 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center p-2 border border-slate-50 shadow-inner shrink-0 group-hover/pkg:scale-110 transition-transform">
+                              {pkgIcon.image ? (
+                                <img src={pkgIcon.image} className="w-full h-full object-contain" alt={pkg.name} />
+                              ) : (
+                                <span className="text-[12px] font-black text-slate-400">{pkg.name[0].toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-black text-foreground tracking-tight truncate leading-tight mb-0.5">{pkg.name}</h4>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block font-mono">
+                                {isInstalling ? (
+                                  <span className="text-purple-600 animate-pulse uppercase">Deploying {installState.progress}%</span>
+                                ) : `v${pkg.version}`}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            disabled={isInstalling}
+                            onClick={() => installPackage(frameworks[0]?.package_manager || 'npm', pkg.name, null)}
+                            className={`w-10 h-10 rounded-xl ${isInstalling ? 'bg-purple-600 text-white' : 'bg-muted text-slate-400 hover:bg-purple-600 hover:text-white'} flex items-center justify-center transition-all active:scale-90 border border-transparent hover:border-purple-400 shadow-sm`}
+                          >
+                            {isInstalling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        {isInstalling ? (
+                          <div className="mb-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] font-black text-purple-600 uppercase tracking-widest animate-pulse">
+                                {installState.throughput || 'Streaming Data...'}
+                              </span>
+                            </div>
+                            <p className="text-[9px] font-mono text-slate-400 truncate bg-muted p-1.5 rounded-md border border-border">
+                              {installState.lastLog || 'Initializing Protocol...'}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground line-clamp-2 font-bold leading-relaxed mb-4 uppercase tracking-wider">
+                            {pkg.description || 'System metadata missing'}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-1 h-1 rounded-full ${isInstalling ? 'bg-purple-400 animate-ping' : 'bg-purple-500 shadow-[0_0_5px_rgba(147,51,234,0.8)]'}`} />
+                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">
+                              {isInstalling ? 'Atomic Install Active' : 'Verified Registry'}
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              ) : engineQuery && !systemBusy && (
+                <motion.div className="text-center py-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <Box className="w-10 h-10 text-slate-100 mx-auto mb-4" />
+                  <p className="text-slate-300 font-black text-[10px] uppercase tracking-[0.3em]">No valid signatures found in registry</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

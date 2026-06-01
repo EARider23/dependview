@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Button } from './ui/button'
@@ -7,6 +7,7 @@ import { ArrowLeft, Layers, Layout, Database, Palette, ChevronRight, Check, Spar
 import { Badge } from './ui/badge'
 import { ScrollArea } from './ui/scroll-area'
 import { techIcons, getTechIcon } from '../assets/iconLinks'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const STEPS = [
     { id: 'app-type', label: 'Project Type', icon: Rocket },
@@ -318,6 +319,12 @@ export function ProjectCreationStudio({ onBack, onImport }) {
     // Mouse tracking for interactive canvas dotted glow
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
+    const logsEndRef = useRef(null)
+
+    useEffect(() => {
+        logsEndRef.current?.scrollIntoView({ behavior: 'auto' })
+    }, [buildLogs])
+
     const handleCanvasMouseMove = (e) => {
         const rect = e.currentTarget.getBoundingClientRect()
         setMousePos({
@@ -355,72 +362,66 @@ export function ProjectCreationStudio({ onBack, onImport }) {
 
     // AI Control Event Listener
     useEffect(() => {
-        let unlisten = null;
+        const unlistenPromise = listen('ai-open-studio', (event) => {
+            let payload = {};
+            try {
+                payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+            } catch (e) {
+                console.error("Failed to parse AI configuration payload", e);
+                return;
+            }
 
-        async function setupAIListener() {
-            unlisten = await listen('ai-open-studio', (event) => {
-                let payload = {};
-                try {
-                    payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
-                } catch (e) {
-                    console.error("Failed to parse AI configuration payload", e);
-                    return;
+            console.log("AI Agent triggered auto-configuration:", payload);
+
+            // Immediately switch to the custom wizard view
+            setView('custom-wizard');
+
+            const newSelections = { ...selections };
+
+            // Process baseArchitecture (e.g. "react") => "frontend"
+            if (payload.baseArchitecture) {
+                const baseMatch = TECH_OPTIONS.frontend.find(t => t.id === payload.baseArchitecture.toLowerCase());
+                if (baseMatch) newSelections.frontend = baseMatch;
+            }
+
+            // Note: The AI agent may also define dataStack/supportStack if needed.
+            // We map simple examples in a best-effort approach.
+            if (payload.dataStack && Array.isArray(payload.dataStack)) {
+                // Try mapping to database or backend
+                for (const item of payload.dataStack) {
+                    const dbMatch = TECH_OPTIONS.database.find(t => t.id === item.toLowerCase());
+                    if (dbMatch) newSelections.database = dbMatch;
+
+                    const beMatch = TECH_OPTIONS.backend.find(t => t.id === item.toLowerCase());
+                    if (beMatch) newSelections.backend = beMatch;
                 }
+            }
 
-                console.log("AI Agent triggered auto-configuration:", payload);
+            if (payload.supportStack && Array.isArray(payload.supportStack)) {
+                // Try mapping to styling or state
+                for (const item of payload.supportStack) {
+                    const styleMatch = TECH_OPTIONS.styling.find(t => t.id === item.toLowerCase());
+                    if (styleMatch) newSelections.styling = styleMatch;
 
-                // Immediately switch to the custom wizard view
-                setView('custom-wizard');
+                    const stateMatch = TECH_OPTIONS.state.find(t => t.id === item.toLowerCase());
+                    if (stateMatch) newSelections.state = stateMatch;
 
-                const newSelections = { ...selections };
-
-                // Process baseArchitecture (e.g. "react") => "frontend"
-                if (payload.baseArchitecture) {
-                    const baseMatch = TECH_OPTIONS.frontend.find(t => t.id === payload.baseArchitecture.toLowerCase());
-                    if (baseMatch) newSelections.frontend = baseMatch;
+                    const testMatch = TECH_OPTIONS.testing.find(t => t.id === item.toLowerCase());
+                    if (testMatch) newSelections.testing = testMatch;
                 }
+            }
 
-                // Note: The AI agent may also define dataStack/supportStack if needed.
-                // We map simple examples in a best-effort approach.
-                if (payload.dataStack && Array.isArray(payload.dataStack)) {
-                    // Try mapping to database or backend
-                    for (const item of payload.dataStack) {
-                        const dbMatch = TECH_OPTIONS.database.find(t => t.id === item.toLowerCase());
-                        if (dbMatch) newSelections.database = dbMatch;
+            // Jump to the review screen if we configured enough base items, else stay on the builder
+            setSelections(newSelections);
 
-                        const beMatch = TECH_OPTIONS.backend.find(t => t.id === item.toLowerCase());
-                        if (beMatch) newSelections.backend = beMatch;
-                    }
-                }
-
-                if (payload.supportStack && Array.isArray(payload.supportStack)) {
-                    // Try mapping to styling or state
-                    for (const item of payload.supportStack) {
-                        const styleMatch = TECH_OPTIONS.styling.find(t => t.id === item.toLowerCase());
-                        if (styleMatch) newSelections.styling = styleMatch;
-
-                        const stateMatch = TECH_OPTIONS.state.find(t => t.id === item.toLowerCase());
-                        if (stateMatch) newSelections.state = stateMatch;
-
-                        const testMatch = TECH_OPTIONS.testing.find(t => t.id === item.toLowerCase());
-                        if (testMatch) newSelections.testing = testMatch;
-                    }
-                }
-
-                // Jump to the review screen if we configured enough base items, else stay on the builder
-                setSelections(newSelections);
-
-                if (newSelections.frontend) {
-                    // Fast-forward to the end of the wizard steps if we auto-configured
-                    setCurrentStepIndex(STEPS.length - 1);
-                }
-            });
-        }
-
-        setupAIListener();
+            if (newSelections.frontend) {
+                // Fast-forward to the end of the wizard steps if we auto-configured
+                setCurrentStepIndex(STEPS.length - 1);
+            }
+        });
 
         return () => {
-            if (unlisten) unlisten.then(f => f());
+            unlistenPromise.then(f => f());
         };
     }, []);
 
@@ -456,28 +457,26 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                 command = 'npx'
                 args = ['--yes', 'create-next-app@latest', projectName, '--typescript', '--tailwind', '--eslint', '--app', '--src-dir', '--import-alias', '@/*', '--use-npm']
             } else if (frontend?.id === 'react') {
-                command = 'npm'
-                args = ['create', 'vite@latest', '--yes', projectName, '--', '--template', 'react-ts']
+                command = 'npx'
+                args = ['--yes', 'create-vite@latest', projectName, '--template', 'react-ts']
             } else if (frontend?.id === 'vue') {
-                command = 'npm'
-                args = ['create', 'vite@latest', '--yes', projectName, '--', '--template', 'vue-ts']
+                command = 'npx'
+                args = ['--yes', 'create-vite@latest', projectName, '--template', 'vue-ts']
             } else if (frontend?.id === 'angular') {
                 command = 'npx'
                 args = ['--yes', '@angular/cli', 'new', projectName, '--routing', '--style', 'css', '--skip-git']
             } else if (frontend?.id === 'svelte') {
-                command = 'npm'
-                args = ['create', 'vite@latest', '--yes', projectName, '--', '--template', 'svelte-ts']
+                command = 'npx'
+                args = ['--yes', 'create-vite@latest', projectName, '--template', 'svelte-ts']
             } else if (frontend?.id === 'astro') {
-                command = 'npm'
-                args = ['create', 'astro@latest', '--yes', projectName, '--', '--template', 'basics', '--no-git', '--no-install']
+                command = 'npx'
+                args = ['--yes', 'create-astro@latest', projectName, '--template', 'basics', '--no-git', '--no-install']
             } else if (frontend?.id === 'react-native') {
                 command = 'npx'
                 args = ['--yes', 'create-expo-app@latest', projectName, '--template', 'blank']
             } else {
-                // If "None" or unknown is selected, we still need to create a folder structure. 
-                // A basic Vite vanilla-ts app is the most flexible empty playground.
-                command = 'npm'
-                args = ['create', 'vite@latest', '--yes', projectName, '--', '--template', 'vanilla-ts']
+                command = 'npx'
+                args = ['--yes', 'create-vite@latest', projectName, '--template', 'vanilla-ts']
             }
         } else {
             // Template based
@@ -491,20 +490,20 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                     args = ['--yes', 'create-next-app@latest', projectName, '--typescript', '--tailwind', '--eslint', '--app', '--src-dir', '--import-alias', '@/*', '--use-npm']
                     break
                 case 'astro':
-                    command = 'npm'
-                    args = ['create', 'astro@latest', '--yes', projectName, '--', '--template', 'basics', '--no-git', '--no-install', '--no-typescript']
+                    command = 'npx'
+                    args = ['--yes', 'create-astro@latest', projectName, '--template', 'basics', '--no-git', '--no-install', '--no-typescript']
                     break
                 case 'react':
-                    command = 'npm'
-                    args = ['create', 'vite@latest', '--yes', projectName, '--', '--template', 'react-ts']
+                    command = 'npx'
+                    args = ['--yes', 'create-vite@latest', projectName, '--template', 'react-ts']
                     break
                 case 'svelte':
-                    command = 'npm'
-                    args = ['create', 'vite@latest', '--yes', projectName, '--', '--template', 'svelte-ts']
+                    command = 'npx'
+                    args = ['--yes', 'create-vite@latest', projectName, '--template', 'svelte-ts']
                     break
                 case 'react-native':
                     command = 'npx'
-                    args = ['create-expo-app', projectName, '--template', 'blank']
+                    args = ['--yes', 'create-expo-app', projectName, '--template', 'blank']
                     break
                 default:
                     command = 'npm'
@@ -558,7 +557,16 @@ export function ProjectCreationStudio({ onBack, onImport }) {
         const unlisten = await listen('scaffold-log', async (event) => {
             const { stream, line, code } = event.payload
 
-            if (stream === 'exit') {
+            if (stream === 'stdout' || stream === 'stderr') {
+                if (line && line.trim()) {
+                    // Strip ANSI escape codes (colors, formatting)
+                    const cleanLine = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').trim()
+                    if (cleanLine) {
+                        setBuildLogs(prev => [...prev, cleanLine])
+                        setActiveFile(cleanLine.slice(0, 60) + (cleanLine.length > 60 ? '...' : ''))
+                    }
+                }
+            } else if (stream === 'exit') {
                 if (code !== 0) {
                     setBuildLogs(prev => [...prev, `Build failed during ${currentPhase} with exit code ${code}`])
                     setIsScaffolding(false)
@@ -685,13 +693,13 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                         // Pages Logic implementation
                         selectedPages.forEach(p => {
                             if (p.id === 'shop') {
-                                tasks.push({ path: getPath('Shop'), content: `import React from 'react'\n\nconst PRODUCTS = [\n  { id: 1, name: 'Premium Theme', price: 59, desc: 'Advanced Tailwind UI Kit' },\n  { id: 2, name: 'Developer Kit', price: 129, desc: 'Full-stack boilerplate' }\n]\n\nexport default function Shop() {\n  return (\n    <div className="p-8">\n      <h1 className="text-2xl font-bold mb-6">Store Front</h1>\n      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">\n        {PRODUCTS.map(p => (\n          <div key={p.id} className="border border-gray-100 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white">\n            <h3 className="font-bold text-lg mb-1">{p.name}</h3>\n            <p className="text-gray-400 text-sm mb-4">{p.desc}</p>\n            <div className="flex items-center justify-between mt-auto">\n                <span className="text-xl font-bold text-indigo-600">\${p.price}</span>\n                <button className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-black transition-colors">Add to Cart</button>\n            </div>\n          </div>\n        ))}\n      </div>\n    </div>\n  )\n}` })
+                                tasks.push({ path: getPath('Shop'), content: `import React from 'react'\n\nconst PRODUCTS = [\n  { id: 1, name: 'Premium Theme', price: 59, desc: 'Advanced Tailwind UI Kit' },\n  { id: 2, name: 'Developer Kit', price: 129, desc: 'Full-stack boilerplate' }\n]\n\nexport default function Shop() {\n  return (\n    <div className="p-8">\n      <h1 className="text-2xl font-bold mb-6">Store Front</h1>\n      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">\n        {PRODUCTS.map(p => (\n          <div key={p.id} className="border border-border p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-card">\n            <h3 className="font-bold text-lg mb-1">{p.name}</h3>\n            <p className="text-gray-400 text-sm mb-4">{p.desc}</p>\n            <div className="flex items-center justify-between mt-auto">\n                <span className="text-xl font-bold text-indigo-600">\${p.price}</span>\n                <button className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-black transition-colors">Add to Cart</button>\n            </div>\n          </div>\n        ))}\n      </div>\n    </div>\n  )\n}` })
                             } else if (p.id === 'dashboard') {
-                                tasks.push({ path: getPath('Dashboard'), content: `import React from 'react'\n\nexport default function Dashboard() {\n  return (\n    <div className="p-8">\n      <h1 className="text-2xl font-bold mb-6">User Analytics</h1>\n      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">\n        <div className="bg-indigo-600 p-6 rounded-2xl text-white shadow-lg shadow-indigo-200">\n          <div className="text-indigo-100 text-xs font-bold mb-1 uppercase tracking-widest">Active Projects</div>\n          <div className="text-3xl font-bold">12</div>\n        </div>\n        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">\n          <div className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-widest">Team Members</div>\n          <div className="text-3xl font-bold text-gray-900">4</div>\n        </div>\n        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">\n          <div className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-widest">Storage Used</div>\n          <div className="text-3xl font-bold text-gray-900">84%</div>\n        </div>\n      </div>\n    </div>\n  )\n}` })
+                                tasks.push({ path: getPath('Dashboard'), content: `import React from 'react'\n\nexport default function Dashboard() {\n  return (\n    <div className="p-8">\n      <h1 className="text-2xl font-bold mb-6">User Analytics</h1>\n      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">\n        <div className="bg-indigo-600 p-6 rounded-2xl text-white shadow-lg shadow-indigo-200">\n          <div className="text-indigo-100 text-xs font-bold mb-1 uppercase tracking-widest">Active Projects</div>\n          <div className="text-3xl font-bold">12</div>\n        </div>\n        <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">\n          <div className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-widest">Team Members</div>\n          <div className="text-3xl font-bold text-foreground">4</div>\n        </div>\n        <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">\n          <div className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-widest">Storage Used</div>\n          <div className="text-3xl font-bold text-foreground">84%</div>\n        </div>\n      </div>\n    </div>\n  )\n}` })
                             } else if (p.id === 'cart') {
                                 tasks.push({ path: 'src/lib/useCart.ts', content: `import { create } from 'zustand'\n\nexport const useCart = create((set) => ({\n  items: [],\n  addItem: (product) => set((state) => ({ items: [...state.items, product] })),\n  clearCart: () => set({ items: [] })\n}))` })
                             } else if (p.id !== 'auth' && p.id !== 'none') {
-                                tasks.push({ path: getPath(p.id.charAt(0).toUpperCase() + p.id.slice(1)), content: `import React from 'react'\n\nexport default function ${p.id.charAt(0).toUpperCase() + p.id.slice(1)}Page() {\n  return (\n    <div className="p-8">\n      <h1 className="text-2xl font-bold mb-4">${p.name}</h1>\n      <p className="text-gray-500">This is the scaffolding for the ${p.name} view.</p>\n    </div>\n  )\n}` })
+                                tasks.push({ path: getPath(p.id.charAt(0).toUpperCase() + p.id.slice(1)), content: `import React from 'react'\n\nexport default function ${p.id.charAt(0).toUpperCase() + p.id.slice(1)}Page() {\n  return (\n    <div className="p-8">\n      <h1 className="text-2xl font-bold mb-4">${p.name}</h1>\n      <p className="text-muted-foreground">This is the scaffolding for the ${p.name} view.</p>\n    </div>\n  )\n}` })
                             }
                         })
 
@@ -712,16 +720,16 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                         // Wrapper for React Router if standard React
                         if (!isNext && selectedPages.length > 0) appContent += `    <BrowserRouter>\n`
 
-                        appContent += `    <div className="min-h-screen bg-[#fcfcfd] text-gray-900 p-8 max-w-6xl mx-auto font-sans">\n      <header className="mb-12 flex items-center justify-between border-b border-gray-100 pb-8">\n        <div className="flex items-center gap-3">\n            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black">W</div>\n            <div className="font-bold text-xl tracking-tight">Workbench Project</div>\n        </div>\n        <nav className="flex gap-8 font-semibold text-sm text-gray-400">\n`
+                        appContent += `    <div className="min-h-screen bg-[#fcfcfd] text-foreground p-8 max-w-6xl mx-auto font-sans">\n      <header className="mb-12 flex items-center justify-between border-b border-border pb-8">\n        <div className="flex items-center gap-3">\n            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black">W</div>\n            <div className="font-bold text-xl tracking-tight">Workbench Project</div>\n        </div>\n        <nav className="flex gap-8 font-semibold text-sm text-gray-400">\n`
 
                         selectedPages.forEach(p => {
                             const linkTag = isNext ? 'a' : 'Link'
                             const hrefAttr = isNext ? 'href' : 'to'
                             const path = p.id === 'home' ? '/' : `/${p.id.toLowerCase()}`
-                            appContent += `          <${linkTag} ${hrefAttr}="${path}" className="hover:text-gray-900 transition-colors">${p.name}</${linkTag}>\n`
+                            appContent += `          <${linkTag} ${hrefAttr}="${path}" className="hover:text-foreground transition-colors">${p.name}</${linkTag}>\n`
                         })
 
-                        appContent += `        </nav>\n      </header>\n      <main className="bg-white p-2 rounded-3xl border border-gray-100 shadow-sm overflow-hidden">\n        <div className="border border-white bg-gray-50/50 rounded-[22px] min-h-[500px] p-6">\n`
+                        appContent += `        </nav>\n      </header>\n      <main className="bg-card p-2 rounded-3xl border border-border shadow-sm overflow-hidden">\n        <div className="border border-white bg-muted/50 rounded-[22px] min-h-[500px] p-6">\n`
 
                         // Inject children (Next.js) or Routes (React Router)
                         if (isNext) {
@@ -935,7 +943,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             if (view === 'templates') onBack();
                             else setView('templates');
                         }}
-                        className="text-gray-400 hover:text-white hover:bg-white/5 rounded-md px-2 h-8 transition-colors"
+                        className="text-gray-400 hover:text-white hover:bg-card/5 rounded-md px-2 h-8 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         {view === 'templates' ? 'Dashboard' : 'Back'}
@@ -953,7 +961,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             <div key={step.id} className="flex items-center">
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all border ${idx === currentStepIndex ? 'bg-indigo-600 border-indigo-400 text-white scale-110 shadow-[0_0_10px_rgba(79,70,229,0.5)]' :
                                     idx < currentStepIndex ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-                                        'bg-[#18181b] border-[#27272a] text-gray-500'
+                                        'bg-[#18181b] border-[#27272a] text-muted-foreground'
                                     }`}>
                                     {idx < currentStepIndex ? <Check className="w-3 h-3" /> : idx + 1}
                                 </div>
@@ -968,7 +976,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
 
                 {/* SIDEBAR (Visible in templates mode) */}
                 {view === 'templates' && (
-                    <div className="w-64 border-r border-[#27272a] bg-[#0e0e11] shrink-0 flex flex-col h-[calc(100vh-3.5rem)] sticky top-14 overflow-y-auto custom-scrollbar">
+                    <div className="w-64 border-r border-white/5 bg-[#0e0e11]/60 backdrop-blur-xl shrink-0 flex flex-col h-[calc(100vh-3.5rem)] sticky top-14 overflow-y-auto custom-scrollbar z-10 shadow-[5px_0_30px_rgba(0,0,0,0.2)]">
                         <div className="p-5 pb-3">
                             <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Templates</h2>
                             <p className="text-sm text-gray-400 leading-relaxed max-w-[200px]">
@@ -978,9 +986,11 @@ export function ProjectCreationStudio({ onBack, onImport }) {
 
                         {/* Custom / Workspace special prominent button */}
                         <div className="px-3 pb-3">
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => setView('custom-wizard')}
-                                className="w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all duration-200 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-500/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] group"
+                                className="w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors duration-200 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-500/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] group"
                             >
                                 <div className="w-8 h-8 rounded-md bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
                                     <Code2 className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
@@ -989,7 +999,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                     <span className="text-sm font-semibold text-indigo-100">Custom Stack</span>
                                     <span className="text-[11px] text-indigo-300/70">Build from scratch wizard</span>
                                 </div>
-                            </button>
+                            </motion.button>
                         </div>
 
                         <div className="h-px bg-gradient-to-r from-transparent via-[#27272a] to-transparent mx-4 my-2" />
@@ -999,17 +1009,19 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             {TEMPLATE_CATEGORIES.map(cat => {
                                 const isActive = activeSidebarItem === cat.id;
                                 return (
-                                    <button
+                                    <motion.button
+                                        whileHover={{ x: 4 }}
+                                        whileTap={{ scale: 0.97 }}
                                         key={cat.id}
                                         onClick={() => setActiveSidebarItem(cat.id)}
-                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive
-                                            ? 'bg-[#1e1e24] text-white shadow-sm'
-                                            : 'text-gray-400 hover:text-gray-200 hover:bg-[#18181b]'
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                                            ? 'bg-white/10 text-white shadow-sm border border-white/5'
+                                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                                             }`}
                                     >
                                         {cat.label}
-                                        {isActive && <ChevronRight className="w-4 h-4 text-gray-500" />}
-                                    </button>
+                                        {isActive && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                                    </motion.button>
                                 )
                             })}
                         </div>
@@ -1026,18 +1038,30 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6">Featured {activeSidebarItem} templates</h3>
 
                             {activeData.featured.length === 0 ? (
-                                <div className="p-8 border border-dashed border-[#27272a] rounded-xl text-center text-gray-500 bg-[#121214]">
+                                <div className="p-8 border border-dashed border-[#27272a] rounded-xl text-center text-muted-foreground bg-[#121214]">
                                     No featured templates available yet for this category.
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+                                <motion.div
+                                    initial="hidden"
+                                    animate="show"
+                                    variants={{
+                                        hidden: {},
+                                        show: { transition: { staggerChildren: 0.05 } }
+                                    }}
+                                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-12"
+                                >
                                     {activeData.featured.map(t => {
                                         const icon = getIcon(t.iconKey)
                                         return (
-                                            <div
+                                            <motion.div
+                                                variants={{
+                                                    hidden: { opacity: 0, y: 20 },
+                                                    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+                                                }}
                                                 key={t.id}
                                                 onClick={() => handleTemplateClick(t)}
-                                                className="bg-[#141417] border border-[#27272a] rounded-xl p-5 cursor-pointer hover:border-[#42424a] hover:bg-[#1a1a1f] transition-all duration-300 group shadow-sm flex flex-col h-full"
+                                                className="bg-[#141417]/80 backdrop-blur-md border border-white/5 rounded-xl p-5 cursor-pointer hover:border-indigo-500/50 hover:bg-[#1a1a1f]/90 transition-all duration-300 group shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] hover:shadow-[0_10px_40px_-10px_rgba(79,70,229,0.3)] hover:-translate-y-1.5 flex flex-col h-full"
                                             >
                                                 <div className="flex items-start gap-4 mb-4">
                                                     <div className={`w-12 h-12 rounded-xl bg-[#0e0e11] border border-[#27272a] flex items-center justify-center shrink-0 overflow-hidden shadow-inner ${t.iconContainerClasses || ''}`}>
@@ -1052,23 +1076,35 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                                     </div>
                                                 </div>
                                                 <p className="text-gray-400 text-sm leading-relaxed mt-auto">{t.desc}</p>
-                                            </div>
+                                            </motion.div>
                                         )
                                     })}
-                                </div>
+                                </motion.div>
                             )}
 
                             {activeData.more && activeData.more.length > 0 && (
                                 <>
                                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-6 border-t border-[#27272a] pt-10">More {activeSidebarItem} templates</h3>
-                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    <motion.div
+                                        initial="hidden"
+                                        animate="show"
+                                        variants={{
+                                            hidden: {},
+                                            show: { transition: { staggerChildren: 0.05 } }
+                                        }}
+                                        className="grid grid-cols-1 xl:grid-cols-2 gap-4"
+                                    >
                                         {activeData.more.map(t => {
                                             const icon = getIcon(t.iconKey)
                                             return (
-                                                <div
+                                                <motion.div
+                                                    variants={{
+                                                        hidden: { opacity: 0, y: 15 },
+                                                        show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+                                                    }}
                                                     key={t.id}
                                                     onClick={() => handleTemplateClick(t)}
-                                                    className="bg-[#141417] border border-[#27272a] rounded-lg p-4 cursor-pointer hover:border-[#42424a] hover:bg-[#1a1a1f] transition-all duration-300 flex items-center gap-4 group"
+                                                    className="bg-[#141417]/80 backdrop-blur-md border border-white/5 rounded-lg p-4 cursor-pointer hover:border-indigo-500/50 hover:bg-[#1a1a1f]/90 transition-all duration-300 flex items-center gap-4 group shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] hover:shadow-[0_10px_30px_-10px_rgba(79,70,229,0.2)] hover:-translate-y-1"
                                                 >
                                                     <div className="w-10 h-10 rounded-lg bg-[#0e0e11] border border-[#27272a] flex items-center justify-center shrink-0 shadow-inner">
                                                         {icon?.image ? (
@@ -1079,12 +1115,12 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                                     </div>
                                                     <div className="flex-1">
                                                         <h4 className="font-semibold text-gray-200 text-sm mb-1">{t.name}</h4>
-                                                        <p className="text-gray-500 text-xs line-clamp-1">{t.desc}</p>
+                                                        <p className="text-muted-foreground text-xs line-clamp-1">{t.desc}</p>
                                                     </div>
-                                                </div>
+                                                </motion.div>
                                             )
                                         })}
-                                    </div>
+                                    </motion.div>
                                 </>
                             )}
                         </div>
@@ -1112,7 +1148,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                         <Terminal className="w-4 h-4 text-indigo-400" />
                                         <span className="text-sm text-gray-300 font-mono tracking-tight">Initialization Command</span>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(getTemplateCommand(selectedTemplate)); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="h-8 text-xs text-gray-400 hover:text-white hover:bg-white/10 px-3">
+                                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(getTemplateCommand(selectedTemplate)); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="h-8 text-xs text-gray-400 hover:text-white hover:bg-card/10 px-3">
                                         {copied ? <Check className="w-3.5 h-3.5 mr-1.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}{copied ? 'Copied' : 'Copy'}
                                     </Button>
                                 </div>
@@ -1129,7 +1165,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                 </h3>
                                 <div className="space-y-5">
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Project Name</label>
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Project Name</label>
                                         <input
                                             type="text"
                                             value={projectName}
@@ -1139,7 +1175,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Storage Location</label>
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Storage Location</label>
                                         <div className="flex gap-2">
                                             <div className="flex-1 bg-[#1a1a1f] border border-[#27272a] rounded-lg px-4 py-2.5 text-sm text-gray-400 truncate font-mono">
                                                 {targetFolder || 'No folder selected'}
@@ -1173,7 +1209,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                     {view === 'custom-wizard' && (
                         <div className="flex h-full animate-in fade-in duration-300">
                             {/* Options Panel */}
-                            <div className="w-96 border-r border-[#27272a] bg-[#121214] flex flex-col relative z-20 shadow-xl overflow-y-auto">
+                            <div className="w-96 border-r border-white/5 bg-[#121214]/80 backdrop-blur-xl flex flex-col relative z-20 shadow-[10px_0_40px_rgba(0,0,0,0.5)] overflow-y-auto">
                                 <div className="p-6 pb-2 shrink-0">
                                     <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-4 text-[10px] tracking-wider uppercase">Step {currentStepIndex + 1} of {STEPS.length}</Badge>
                                     <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Select {currentCategory.label}</h2>
@@ -1181,7 +1217,16 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                 </div>
 
                                 <ScrollArea className="flex-1 px-4 mt-2">
-                                    <div className="space-y-2.5 pb-6">
+                                    <motion.div
+                                        initial="hidden"
+                                        animate="show"
+                                        variants={{
+                                            hidden: {},
+                                            show: { transition: { staggerChildren: 0.05 } }
+                                        }}
+                                        key={currentStepIndex}
+                                        className="space-y-2.5 pb-6"
+                                    >
                                         {TECH_OPTIONS[currentCategory.id].map(tech => {
                                             const stepSelections = selections[currentCategory.id]
                                             const isSelected = currentCategory.multi
@@ -1193,21 +1238,25 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                             const isCompatible = cap.compatible
 
                                             return (
-                                                <div
+                                                <motion.div
+                                                    variants={{
+                                                        hidden: { opacity: 0, x: -20 },
+                                                        show: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+                                                    }}
                                                     key={tech.id}
                                                     onClick={() => isCompatible && handleSelect(tech)}
-                                                    className={`p-3.5 rounded-xl border flex items-center gap-4 transition-all duration-200 group relative ${isSelected
-                                                        ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_4px_20px_rgba(79,70,229,0.15)] ring-1 ring-indigo-500/50 cursor-pointer'
+                                                    className={`p-3.5 rounded-xl border flex items-center gap-4 transition-all duration-300 group relative ${isSelected
+                                                        ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_4px_20px_rgba(79,70,229,0.2)] ring-1 ring-indigo-500/50 cursor-pointer scale-[1.02]'
                                                         : !isCompatible
                                                             ? 'border-red-900/20 bg-red-950/5 opacity-40 cursor-not-allowed filter grayscale'
-                                                            : 'border-[#27272a] hover:border-[#42424a] bg-[#18181b] hover:bg-[#1a1a1f] cursor-pointer'
+                                                            : 'border-white/5 hover:border-indigo-500/30 bg-[#18181b]/60 hover:bg-[#1a1a1f]/80 backdrop-blur-md cursor-pointer hover:shadow-[0_4px_15px_rgba(79,70,229,0.1)] hover:-translate-y-0.5'
                                                         }`}
                                                 >
                                                     <div className="w-10 h-10 rounded-lg bg-[#0e0e11] border border-[#27272a] flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
                                                         {iconData?.image ? (
                                                             <img src={iconData.image} className={`w-6 h-6 object-contain ${isSelected ? '' : 'opacity-80 group-hover:opacity-100'}`} />
                                                         ) : (
-                                                            <span className="text-base font-bold text-gray-500">{tech.name[0]}</span>
+                                                            <span className="text-base font-bold text-muted-foreground">{tech.name[0]}</span>
                                                         )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -1219,7 +1268,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                                                 </Badge>
                                                             )}
                                                         </div>
-                                                        <div className="text-xs text-gray-500 truncate">{tech.desc}</div>
+                                                        <div className="text-xs text-muted-foreground truncate">{tech.desc}</div>
                                                     </div>
                                                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-[#42424a] bg-[#121214]'}`}>
                                                         {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -1228,16 +1277,16 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                                     {!isCompatible && (
                                                         <div className="absolute inset-0 z-10 bg-transparent rounded-xl" title={cap.reason} />
                                                     )}
-                                                </div>
+                                                </motion.div>
                                             )
                                         })}
-                                    </div>
+                                    </motion.div>
                                 </ScrollArea>
 
-                                <div className="p-4 border-t border-[#27272a] bg-[#121214] flex justify-between items-center shrink-0 sticky bottom-0">
-                                    <Button variant="ghost" onClick={handleBackStep} className="text-gray-400 hover:text-white hover:bg-white/5 h-9">Back</Button>
+                                <div className="p-4 border-t border-white/5 bg-[#121214]/90 backdrop-blur-md flex justify-between items-center shrink-0 sticky bottom-0">
+                                    <Button variant="ghost" onClick={handleBackStep} className="text-gray-400 hover:text-white hover:bg-card/5 h-9">Back</Button>
                                     <div className="flex gap-2">
-                                        <Button variant="ghost" onClick={handleSkip} className="text-gray-500 hover:text-gray-300 hover:bg-white/5 h-9 text-xs">Skip Step</Button>
+                                        <Button variant="ghost" onClick={handleSkip} className="text-muted-foreground hover:text-gray-300 hover:bg-card/5 h-9 text-xs">Skip Step</Button>
                                         <Button onClick={handleNext} disabled={!isStepComplete} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium h-9 px-5 shadow-lg shadow-indigo-500/20 disabled:opacity-30 disabled:shadow-none">
                                             {currentStepIndex === STEPS.length - 1 ? 'Finish' : 'Next'} <ChevronRight className="w-4 h-4 ml-1.5" />
                                         </Button>
@@ -1253,26 +1302,77 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             >
                                 {/* Base dim dotted grid */}
                                 <div
-                                    className="absolute inset-0 pointer-events-none opacity-50"
+                                    className="absolute inset-0 pointer-events-none opacity-40"
                                     style={{
-                                        backgroundImage: `radial-gradient(circle, #3f3f46 1.5px, transparent 1.5px)`,
+                                        backgroundImage: `radial-gradient(circle, #3f3f46 1px, transparent 1px)`,
                                         backgroundSize: '24px 24px',
+                                        backgroundPosition: '0 0',
+                                        WebkitMaskImage: `radial-gradient(circle at center, black 0%, transparent 100%)`,
+                                        maskImage: `radial-gradient(circle at center, black 0%, transparent 100%)`,
                                     }}
                                 />
 
-                                {/* Glowing dots that only appear near the mouse */}
+                                {/* True Random Twinkling Layer via SVG Pattern */}
+                                <style>
+                                    {`
+                                        @keyframes true-twinkle {
+                                            0%, 100% { opacity: 0; }
+                                            50% { opacity: 1; }
+                                        }
+                                        .twinkle-dot {
+                                            animation: true-twinkle var(--duration) ease-in-out var(--delay) infinite;
+                                        }
+                                    `}
+                                </style>
                                 <div
                                     className="absolute inset-0 pointer-events-none"
                                     style={{
-                                        backgroundImage: `radial-gradient(circle, #818cf8 1.5px, transparent 1.5px)`,
-                                        backgroundSize: '24px 24px',
-                                        WebkitMaskImage: `radial-gradient(150px circle at ${mousePos.x}px ${mousePos.y}px, black, transparent)`,
-                                        maskImage: `radial-gradient(150px circle at ${mousePos.x}px ${mousePos.y}px, black, transparent)`,
+                                        WebkitMaskImage: `radial-gradient(120px circle at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 100%)`,
+                                        maskImage: `radial-gradient(120px circle at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 100%)`,
+                                        opacity: mousePos.x !== -1000 ? 1 : 0,
+                                        transition: 'opacity 0.3s ease',
                                     }}
-                                />
+                                >
+                                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                        <defs>
+                                            <pattern id="random-twinkle" width="240" height="240" patternUnits="userSpaceOnUse">
+                                                {Array.from({ length: 100 }).map((_, i) => {
+                                                    const x = (i % 10) * 24;
+                                                    const y = Math.floor(i / 10) * 24;
+                                                    // Pseudo-random deterministic values so it doesn't re-render differently
+                                                    const seed = Math.sin(i * 9999) * 10000;
+                                                    const rand = seed - Math.floor(seed);
+                                                    const delay = rand * 3;
+                                                    const duration = 1.5 + (rand * 2);
+                                                    return (
+                                                        <circle
+                                                            key={i}
+                                                            cx={x}
+                                                            cy={y}
+                                                            r="1.5"
+                                                            fill="#a5b4fc"
+                                                            className="twinkle-dot"
+                                                            style={{
+                                                                '--delay': `${delay}s`,
+                                                                '--duration': `${duration}s`
+                                                            }}
+                                                        />
+                                                    );
+                                                })}
+                                            </pattern>
+                                        </defs>
+                                        <rect width="100%" height="100%" fill="url(#random-twinkle)" />
+                                    </svg>
+                                </div>
+
+
 
                                 {/* Ambient glow */}
-                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-indigo-900/5 rounded-full blur-[100px] pointer-events-none" />
+                                <motion.div
+                                    animate={{ opacity: [0.3, 0.6, 0.3], scale: [0.9, 1.1, 0.9] }}
+                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-indigo-900/10 rounded-full blur-[100px] pointer-events-none"
+                                />
 
                                 {/* Radar circles representing the rings */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1283,18 +1383,40 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                 </div>
 
                                 {selectedItemsFlat.length === 0 ? (
-                                    <div className="text-center z-10 p-8 rounded-2xl bg-[#141417]/80 backdrop-blur-sm border border-[#27272a] shadow-xl">
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="text-center z-10 p-8 rounded-2xl bg-[#141417]/80 backdrop-blur-md border border-white/5 shadow-2xl"
+                                    >
                                         <Layers className="w-12 h-12 mx-auto mb-4 text-indigo-400/50" />
                                         <p className="text-gray-300 font-medium tracking-wide">Workspace Empty</p>
-                                        <p className="text-gray-500 text-sm mt-1">Select technologies to build your stack</p>
-                                    </div>
+                                        <p className="text-muted-foreground text-sm mt-1">Select technologies to build your stack</p>
+                                    </motion.div>
                                 ) : (
                                     <div className="relative w-[860px] h-[860px]">
                                         {/* Center Core */}
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[#141417] border-2 border-[#27272a] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(79,70,229,0.15)] z-20">
-                                            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full flex items-center justify-center absolute inset-0 m-auto animate-pulse" />
-                                            <Layers className="w-8 h-8 text-indigo-400 relative z-10" />
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-zinc-900/80 backdrop-blur-xl border border-indigo-500/40 rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(99,102,241,0.3)] z-20">
+                                            <motion.div
+                                                animate={{ rotate: 360 }}
+                                                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                className="w-20 h-20 bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-transparent rounded-full flex items-center justify-center absolute inset-0 m-auto"
+                                            />
+                                            <motion.div
+                                                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+                                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                                className="w-16 h-16 bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full flex items-center justify-center absolute inset-0 m-auto blur-md"
+                                            />
+                                            <Layers className="w-8 h-8 text-indigo-300 relative z-10" />
                                         </div>
+
+                                        {/* Visible Orbit Rings */}
+                                        {[80, 150, 220, 290].map((radius, i) => (
+                                            <div
+                                                key={`ring-${i}`}
+                                                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-indigo-400/10 shadow-[inset_0_0_20px_rgba(99,102,241,0.02)] pointer-events-none"
+                                                style={{ width: radius * 2, height: radius * 2 }}
+                                            />
+                                        ))}
 
                                         {/* Orbiting items organized into rings */}
                                         {(() => {
@@ -1323,35 +1445,40 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                                         renderLucideIcon(item.iconKey, "w-6 h-6 text-gray-400 group-hover:text-indigo-400 transition-colors") :
                                                         (getIcon(item.iconKey)?.image ?
                                                             <img src={getIcon(item.iconKey).image} className="w-8 h-8 object-contain" /> :
-                                                            <span className="text-lg font-bold text-gray-500">{item.name[0]}</span>
+                                                            <span className="text-lg font-bold text-muted-foreground">{item.name[0]}</span>
                                                         )
 
                                                     return (
                                                         <div
                                                             key={`${item.categoryId}-${item.id}`}
-                                                            className="absolute top-1/2 left-1/2"
+                                                            className="absolute top-1/2 left-1/2 z-10"
                                                             style={{
                                                                 transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y + float}px))`,
                                                             }}
                                                         >
-                                                            <div className="relative group">
-                                                                <div className="w-14 h-14 rounded-xl bg-[#18181b] shadow-2xl border border-[#3f3f46] flex items-center justify-center overflow-hidden hover:scale-110 transition-transform duration-300 hover:border-indigo-500/50 hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] z-10 relative">
+                                                            <motion.div
+                                                                initial={{ scale: 0, opacity: 0 }}
+                                                                animate={{ scale: 1, opacity: 1 }}
+                                                                transition={{ type: "spring", stiffness: 300, damping: 20, delay: ringNum * 0.1 + index * 0.05 }}
+                                                                className="relative group"
+                                                            >
+                                                                <div className="w-14 h-14 rounded-full bg-zinc-900/80 backdrop-blur-xl shadow-2xl border border-indigo-500/20 flex items-center justify-center overflow-hidden group-hover:scale-110 transition-all duration-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-500/10 group-hover:shadow-[0_0_40px_rgba(99,102,241,0.4)] z-10 relative">
                                                                     {iconRender}
                                                                 </div>
 
                                                                 {/* Tooltip */}
-                                                                <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30">
-                                                                    <div className="bg-[#18181b] border border-[#27272a] text-gray-200 text-xs px-2.5 py-1.5 rounded-md shadow-xl font-medium tracking-wide flex items-center gap-1">
-                                                                        <span className="text-[9px] text-gray-500 uppercase">Ring {ringNum}</span>
-                                                                        <div className="w-px h-3 bg-[#3f3f46]"></div>
+                                                                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30">
+                                                                    <div className="bg-zinc-900/90 backdrop-blur-xl border border-indigo-500/30 text-indigo-50 text-xs px-3 py-1.5 rounded-full shadow-[0_10px_30px_rgba(99,102,241,0.2)] font-medium tracking-wide flex items-center gap-1.5">
+                                                                        <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider">Ring {ringNum}</span>
+                                                                        <div className="w-1 h-1 rounded-full bg-indigo-500/50"></div>
                                                                         {item.name}
                                                                     </div>
                                                                 </div>
                                                                 {/* Number Badge */}
-                                                                <div className="absolute -top-2 -right-2 w-5 h-5 bg-[#18181b] border border-[#3f3f46] rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shadow-lg z-20">
+                                                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-zinc-900 border border-indigo-400/40 rounded-full flex items-center justify-center text-indigo-300 text-[10px] font-bold shadow-[0_0_15px_rgba(99,102,241,0.5)] z-20">
                                                                     {STEPS.findIndex(s => s.id === item.categoryId) + 1}
                                                                 </div>
-                                                            </div>
+                                                            </motion.div>
                                                         </div>
                                                     )
                                                 })
@@ -1365,7 +1492,12 @@ export function ProjectCreationStudio({ onBack, onImport }) {
 
                     {/* REVIEW CUSTOM STACK */}
                     {view === 'review-custom' && (
-                        <div className="max-w-2xl mx-auto py-16 px-6 animate-in slide-in-from-bottom-8 duration-500">
+                        <motion.div
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                            className="max-w-2xl mx-auto py-16 px-6"
+                        >
                             <div className="text-center mb-10">
                                 <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-1.5 rounded-full font-medium text-sm tracking-wide mb-6 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
                                     <Check className="w-4 h-4" /> Stack Configured
@@ -1375,69 +1507,84 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             </div>
 
                             {/* Icons Summary Line */}
-                            <div className="flex flex-wrap justify-center gap-6 mb-12 bg-[#141417] border border-[#27272a] p-8 rounded-2xl shadow-xl">
+                            <motion.div
+                                initial="hidden"
+                                animate="show"
+                                variants={{
+                                    hidden: {},
+                                    show: { transition: { staggerChildren: 0.1 } }
+                                }}
+                                className="flex flex-wrap justify-center gap-6 mb-12 bg-[#141417]/80 backdrop-blur-xl border border-white/5 p-8 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
+                            >
                                 {selectedItemsFlat.map((item, idx) => {
                                     const iconRender = item.isLucide ?
                                         renderLucideIcon(item.iconKey, "w-7 h-7 text-gray-400 group-hover:text-indigo-400 group-hover:scale-110 transition-all") :
                                         (getIcon(item.iconKey)?.image ?
                                             <img src={getIcon(item.iconKey).image} className="w-7 h-7 object-contain group-hover:scale-110 transition-transform" /> :
-                                            <span className="font-bold text-gray-500 text-xl">{item.name[0]}</span>
+                                            <span className="font-bold text-muted-foreground text-xl">{item.name[0]}</span>
                                         )
 
                                     return (
-                                        <div key={`${item.categoryId}-${item.id}-${idx}`} className="text-center flex flex-col items-center group">
-                                            <div className="w-14 h-14 rounded-xl bg-[#0e0e11] border border-[#27272a] flex items-center justify-center overflow-hidden mb-3 group-hover:border-indigo-500/50 transition-colors shadow-inner">
+                                        <motion.div
+                                            variants={{
+                                                hidden: { opacity: 0, scale: 0.5 },
+                                                show: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 20 } }
+                                            }}
+                                            key={`${item.categoryId}-${item.id}-${idx}`}
+                                            className="text-center flex flex-col items-center group"
+                                        >
+                                            <div className="w-14 h-14 rounded-xl bg-[#0e0e11]/80 backdrop-blur-md border border-white/5 flex items-center justify-center overflow-hidden mb-3 group-hover:border-indigo-500/50 transition-colors shadow-inner group-hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] group-hover:-translate-y-1 transform duration-300">
                                                 {iconRender}
                                             </div>
-                                            <span className="text-xs text-gray-500 font-medium tracking-wide uppercase group-hover:text-gray-300 transition-colors">{item.name}</span>
-                                        </div>
+                                            <span className="text-xs text-muted-foreground font-medium tracking-wide uppercase group-hover:text-gray-300 transition-colors">{item.name}</span>
+                                        </motion.div>
                                     )
                                 })}
-                            </div>
+                            </motion.div>
 
                             {/* Command */}
-                            <Card className="mb-8 border-[#27272a] bg-[#141417] shadow-xl overflow-hidden rounded-xl">
-                                <div className="bg-[#1a1a1f] px-5 py-3.5 flex items-center justify-between border-b border-[#27272a]">
+                            <Card className="mb-8 border-white/5 bg-[#141417]/80 backdrop-blur-xl shadow-2xl overflow-hidden rounded-xl">
+                                <div className="bg-[#1a1a1f]/80 px-5 py-3.5 flex items-center justify-between border-b border-white/5">
                                     <div className="flex items-center gap-2">
                                         <Terminal className="w-4 h-4 text-indigo-400" />
                                         <span className="text-sm text-gray-300 font-mono tracking-tight">Initialization Command</span>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(generateCustomCommand()); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="h-8 text-xs text-gray-400 hover:text-white hover:bg-white/10 px-3">
+                                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(generateCustomCommand()); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="h-8 text-xs text-gray-400 hover:text-white hover:bg-white/10 px-3 transition-colors">
                                         {copied ? <Check className="w-3.5 h-3.5 mr-1.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}{copied ? 'Copied' : 'Copy'}
                                     </Button>
                                 </div>
-                                <div className="bg-[#0a0a0c] p-6 text-emerald-400 font-mono text-sm shadow-inner overflow-x-auto whitespace-nowrap">
+                                <div className="bg-[#0a0a0c]/80 p-6 text-emerald-400 font-mono text-sm shadow-inner overflow-x-auto whitespace-nowrap">
                                     {generateCustomCommand()}
                                 </div>
                             </Card>
 
                             {/* Project Settings */}
-                            <Card className="mb-8 border-[#27272a] bg-[#141417] shadow-xl p-6 rounded-xl">
+                            <Card className="mb-8 border-white/5 bg-[#141417]/80 backdrop-blur-xl shadow-2xl p-6 rounded-xl">
                                 <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                                     <Sparkles className="w-4 h-4 text-indigo-400" />
                                     Workspace Configuration
                                 </h3>
                                 <div className="space-y-5">
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Project Name</label>
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Project Name</label>
                                         <input
                                             type="text"
                                             value={projectName}
                                             onChange={(e) => setProjectName(e.target.value)}
-                                            className="w-full bg-[#0a0a0c] border border-[#27272a] rounded-lg px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all font-mono"
+                                            className="w-full bg-[#0a0a0c]/80 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all font-mono backdrop-blur-md"
                                             placeholder="my-awesome-app"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Storage Location</label>
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Storage Location</label>
                                         <div className="flex gap-2">
-                                            <div className="flex-1 bg-[#1a1a1f] border border-[#27272a] rounded-lg px-4 py-2.5 text-sm text-gray-400 truncate font-mono">
+                                            <div className="flex-1 bg-[#1a1a1f]/80 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-400 truncate font-mono backdrop-blur-md">
                                                 {targetFolder || 'No folder selected'}
                                             </div>
                                             <Button
                                                 variant="outline"
                                                 onClick={handlePickFolder}
-                                                className="border-[#27272a] bg-[#1a1a1f] hover:bg-[#27272a] text-gray-300 h-10 px-4"
+                                                className="border-white/10 bg-[#1a1a1f]/80 hover:bg-white/5 text-gray-300 h-10 px-4 backdrop-blur-md transition-colors"
                                             >
                                                 Browse
                                             </Button>
@@ -1447,7 +1594,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                             </Card>
 
                             <div className="flex justify-center gap-4">
-                                <Button variant="outline" onClick={() => setView('custom-wizard')} className="border-[#3f3f46] text-gray-300 hover:bg-[#27272a] hover:text-white h-11 px-6">
+                                <Button variant="outline" onClick={() => setView('custom-wizard')} className="border-white/10 bg-zinc-900/50 text-gray-300 hover:bg-white/10 hover:text-white h-11 px-6 backdrop-blur-md transition-colors">
                                     <ArrowLeft className="w-4 h-4 mr-2" /> Review Selections
                                 </Button>
                                 <Button
@@ -1458,7 +1605,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                     Build Custom Workspace <Rocket className="w-4 h-4 ml-2" />
                                 </Button>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
 
                     {/* BUILDING VIEW */}
@@ -1491,22 +1638,23 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                     <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
                                     <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
                                     <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50" />
-                                    <span className="ml-2 text-xs font-mono text-gray-500">{activeFile}</span>
+                                    <span className="ml-2 text-xs font-mono text-muted-foreground">{activeFile}</span>
                                 </div>
-                                <div className="p-6 h-[240px] font-mono text-sm overflow-y-auto flex flex-col justify-end">
+                                <div className="p-6 h-[240px] font-mono text-sm overflow-y-auto">
                                     <div className="space-y-2.5">
                                         {buildLogs.map((log, i) => (
-                                            <div key={i} className="flex gap-3 animate-in slide-in-from-left-2 opacity-0 fade-in fill-mode-forwards" style={{ animationDelay: '0ms', animationDuration: '300ms' }}>
+                                            <div key={i} className="flex gap-3">
                                                 <span className="text-gray-600 shrink-0">[{new Date().toLocaleTimeString()}]</span>
-                                                <span className={i === buildLogs.length - 1 && buildProgress < 100 ? 'text-indigo-300' : 'text-emerald-400/80'}>{log}</span>
+                                                <span className={i === buildLogs.length - 1 && buildProgress < 100 ? 'text-indigo-300' : 'text-emerald-400/80 break-all'}>{log}</span>
                                             </div>
                                         ))}
                                         {buildProgress < 100 && (
                                             <div className="flex gap-3 mt-2 animate-pulse">
                                                 <span className="text-gray-600">[{new Date().toLocaleTimeString()}]</span>
-                                                <span className="text-gray-500">...</span>
+                                                <span className="text-muted-foreground">...</span>
                                             </div>
                                         )}
+                                        <div ref={logsEndRef} />
                                     </div>
                                 </div>
                                 <div className="border-t border-[#27272a] bg-[#141417] p-4 flex items-center">
@@ -1521,12 +1669,94 @@ export function ProjectCreationStudio({ onBack, onImport }) {
 
                     {/* SUCCESS VIEW */}
                     {view === 'success' && (
-                        <div className="max-w-2xl mx-auto py-24 px-6 text-center animate-in zoom-in-95 duration-500">
-                            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400 mb-8 shadow-[0_0_50px_rgba(16,185,129,0.2)]">
-                                <Check className="w-12 h-12" />
+                        <div className="w-full max-w-5xl mx-auto h-full px-6 flex flex-col justify-center items-center">
+
+                            {/* 1. Tick Mark Popup (Moved Above Text) */}
+                            <motion.div
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 20, delay: 1.4 }}
+                                className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500 text-white mb-6 shadow-[0_0_30px_rgba(16,185,129,0.4)]"
+                            >
+                                <motion.div
+                                    initial={{ scale: 0, rotate: -45 }}
+                                    animate={{ scale: 1, rotate: 0 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 15, delay: 1.6 }}
+                                >
+                                    <Check className="w-6 h-6" />
+                                </motion.div>
+                            </motion.div>
+
+                            {/* 2. Typewriter Animation (Moved Below Tick) */}
+                            <div className="flex justify-center mb-8">
+                                <div className="relative inline-flex items-center">
+                                    {/* Invisible text to set natural width and centering */}
+                                    <h2 className="text-4xl font-black text-transparent tracking-tight select-none">Project Initialized</h2>
+
+                                    {/* Animated mask revealing the text */}
+                                    <motion.div
+                                        className="absolute top-0 left-0 h-full overflow-hidden flex items-center"
+                                        initial={{ width: 0 }}
+                                        animate={{ width: "100%" }}
+                                        transition={{ duration: 1.0, ease: "linear", delay: 0.2 }}
+                                    >
+                                        <h2 className="text-4xl font-black text-white tracking-tight whitespace-nowrap">Project Initialized</h2>
+                                    </motion.div>
+
+                                    {/* Blinking Cursor riding the text edge */}
+                                    <motion.div
+                                        className="absolute top-0 h-full flex items-center"
+                                        initial={{ left: 0 }}
+                                        animate={{ left: "100%" }}
+                                        transition={{ duration: 1.0, ease: "linear", delay: 0.2 }}
+                                    >
+                                        <motion.span
+                                            animate={{ opacity: [1, 0, 1] }}
+                                            transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                                            className="text-4xl font-black text-indigo-400"
+                                        >
+                                            _
+                                        </motion.span>
+                                    </motion.div>
+                                </div>
                             </div>
-                            <h2 className="text-4xl font-black text-white mb-4 tracking-tight">Project Initialized</h2>
-                            <p className="text-gray-400 text-lg mb-8 max-w-lg mx-auto">Your visual components, backend logic, and styling engine have been successfully interconnected.</p>
+
+                            {/* Description Text (Matrix Terminal Style) */}
+                            <motion.div
+                                initial={{ opacity: 0, scaleX: 0 }}
+                                animate={{ opacity: 1, scaleX: 1 }}
+                                transition={{ duration: 0.6, delay: 2.0, type: "spring", stiffness: 100, damping: 15 }}
+                                className="mb-12 w-full max-w-4xl mx-auto flex justify-center origin-center"
+                            >
+                                <style>{`
+                                    .crt-glitch {
+                                        animation: textGlitch 3s infinite;
+                                    }
+                                    @keyframes textGlitch {
+                                        0%, 94%, 98%, 100% { opacity: 1; transform: none; text-shadow: none; filter: none; }
+                                        95% { opacity: 0.8; transform: skew(-10deg) translate(-2px, 1px); text-shadow: -2px 0 red, 2px 0 blue; filter: hue-rotate(90deg); }
+                                        97% { opacity: 0.9; transform: skew(10deg) translate(2px, -1px); text-shadow: 2px 0 #0f0, -2px 0 #f0f; filter: hue-rotate(-90deg); }
+                                    }
+                                `}</style>
+                                <div className="bg-black/90 backdrop-blur-xl border border-emerald-500/30 rounded py-2.5 px-4 shadow-[0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden flex items-center gap-3 w-fit">
+                                    {/* Scanline overlay */}
+                                    <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.05)_50%,transparent_50%)] bg-[length:100%_4px] pointer-events-none" />
+
+                                    <Terminal className="w-4 h-4 text-emerald-500 shrink-0 opacity-80 crt-glitch" />
+                                    <p className="text-emerald-400 text-[13px] font-mono tracking-tight whitespace-nowrap relative z-10 flex items-center crt-glitch">
+                                        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 2.6 }}>Your visual components,&nbsp;</motion.span>
+                                        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 3.2 }}>backend logic,&nbsp;</motion.span>
+                                        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 3.8 }}>and styling engine&nbsp;</motion.span>
+                                        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 4.4 }}>have been&nbsp;</motion.span>
+                                        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 5.0 }}>successfully interconnected.</motion.span>
+                                        <motion.span
+                                            animate={{ opacity: [1, 0, 1] }}
+                                            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                            className="inline-block w-2 h-3.5 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)] ml-1.5"
+                                        />
+                                    </p>
+                                </div>
+                            </motion.div>
 
                             {/* ENV VAR FORM */}
                             {showEnvForm && (
@@ -1537,7 +1767,7 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                     <div className="space-y-4">
                                         {Object.keys(envInputs).map(envKey => (
                                             <div key={envKey} className="space-y-1.5">
-                                                <label className="text-[10px] font-bold text-gray-500 uppercase">{envKey.replace(/_/g, ' ')}</label>
+                                                <label className="text-[10px] font-bold text-muted-foreground uppercase">{envKey.replace(/_/g, ' ')}</label>
                                                 <input
                                                     type="text"
                                                     value={envInputs[envKey]}
@@ -1588,24 +1818,32 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                 </div>
                             )}
 
-                            <div className="flex justify-center gap-4">
-                                <Button variant="outline" onClick={() => { setView('templates'); setBuildLogs([]); setBuildProgress(0); setGeneratedFiles([]); setShowEnvForm(false); }} className="border-[#3f3f46] text-gray-300 hover:bg-[#27272a] hover:text-white h-12 px-8 text-base shrink-0">
+                            <motion.div
+                                initial={{ opacity: 0, y: 40 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ type: "spring", stiffness: 200, damping: 25, delay: 5.6 }}
+                                className="flex justify-center gap-4 w-full"
+                            >
+                                <Button variant="outline" onClick={() => { setView('templates'); setBuildLogs([]); setBuildProgress(0); setGeneratedFiles([]); setShowEnvForm(false); }} className="border-white/10 bg-zinc-900/50 text-gray-300 hover:bg-white/10 hover:text-white h-12 px-8 text-base shrink-0 backdrop-blur-md transition-colors">
                                     <ArrowLeft className="w-4 h-4 mr-2" /> Back to Studio
                                 </Button>
 
-                                <div className="flex items-center bg-[#141417] border border-[#27272a] rounded-md h-12 p-1 overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)] flex-1 max-w-sm">
+                                <div className="flex items-center bg-[#141417] border border-[#27272a] rounded-md h-12 p-1 overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)] w-full max-w-md">
                                     <select
                                         value={preferredIde}
                                         onChange={(e) => setPreferredIde(e.target.value)}
-                                        className="bg-transparent text-sm text-gray-300 outline-none border-none px-3 focus:ring-0 cursor-pointer hover:text-white transition-colors"
+                                        className="bg-transparent text-sm text-gray-300 outline-none border-none px-3 focus:ring-0 cursor-pointer hover:text-white transition-colors w-full"
                                     >
                                         <option value="vscode" className="bg-[#18181b]">VS Code</option>
                                         <option value="cursor" className="bg-[#18181b]">Cursor</option>
+                                        <option value="windsurf" className="bg-[#18181b]">Windsurf</option>
+                                        <option value="antigravity" className="bg-[#18181b]">Antigravity</option>
+                                        <option value="pycharm" className="bg-[#18181b]">PyCharm</option>
                                         <option value="zed" className="bg-[#18181b]">Zed</option>
                                         <option value="explorer" className="bg-[#18181b]">File Explorer</option>
-                                        <option value="deped" className="bg-[#18181b]">DepEd Software (Directly Import)</option>
+                                        <option value="deped" className="bg-[#18181b]">PEAK (Direct Import)</option>
                                     </select>
-                                    <div className="w-px h-6 bg-[#27272a] mx-1" />
+                                    <div className="w-px h-6 bg-[#27272a] mx-1 shrink-0" />
                                     <Button
                                         onClick={() => {
                                             const fullPath = targetFolder.endsWith('/') || targetFolder.endsWith('\\')
@@ -1619,12 +1857,12 @@ export function ProjectCreationStudio({ onBack, onImport }) {
                                                     .catch(err => console.error("Failed to open IDE:", err))
                                             }
                                         }}
-                                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-full flex-1 rounded text-sm px-6"
+                                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-full rounded text-sm px-6 whitespace-nowrap shrink-0 transition-transform hover:scale-105"
                                     >
                                         <FolderOpen className="w-4 h-4 mr-2" /> Open Project
                                     </Button>
                                 </div>
-                            </div>
+                            </motion.div>
                         </div>
                     )}
                 </div>
