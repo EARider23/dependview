@@ -1,6 +1,6 @@
 <div align="center">
   <img src="src-tauri/icons/icon.png" width="128" alt="Deped Logo">
-  <h1>Deped</h1>
+  <h1>PEEAK</h1>
   <p><strong>A Modern, Visual Package Manager & Project Analyzer</strong></p>
 </div>
 
