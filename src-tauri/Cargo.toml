@@ -40,3 +40,10 @@ opt-level = 3
 [profile.dev]
 incremental = true
 split-debuginfo = "unpacked" # Faster linking on Windows
+
+[profile.release]
+strip = true
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
