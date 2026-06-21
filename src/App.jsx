@@ -135,15 +135,18 @@ function App() {
   // Global Keyboard Security Block
   React.useEffect(() => {
     const handleKeyDown = (e) => {
-      // Block F12, Ctrl+Shift+I (DevTools), F5, Ctrl+R (Refresh)
-      if (
-        e.key === 'F12' || 
-        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) || 
-        e.key === 'F5' || 
-        (e.ctrlKey && (e.key === 'r' || e.key === 'R'))
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
+      // Block F12, Ctrl+Shift+I (DevTools), F5, Ctrl+R (Refresh) ONLY in Production!
+      // In development (npm run tauri dev), we let you use them to debug.
+      if (import.meta.env.PROD) {
+        if (
+          e.key === 'F12' || 
+          (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) || 
+          e.key === 'F5' || 
+          (e.ctrlKey && (e.key === 'r' || e.key === 'R'))
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
       }
     };
     
