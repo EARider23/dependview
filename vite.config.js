@@ -23,6 +23,10 @@ export default defineConfig({
       }
     })
   ],
+  // Prevent vite from obscuring rust errors
+  clearScreen: false,
+  // Make use of `TAURI_DEBUG` and other env variables
+  envPrefix: ['VITE_', 'TAURI_'],
   server: {
     port: 1420,
     strictPort: true
