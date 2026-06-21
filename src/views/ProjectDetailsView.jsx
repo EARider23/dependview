@@ -1315,7 +1315,7 @@ const ProjectDetailsView = React.memo(({
                         </Badge>
                       )}
                       {displayMetrics.totalVulns === 0 && (
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg">
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-black text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg hover:bg-emerald-700 hover:text-white transition-colors">
                           Verified Clean
                         </Badge>
                       )}
