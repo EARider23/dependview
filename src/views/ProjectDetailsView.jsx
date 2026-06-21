@@ -1702,7 +1702,7 @@ const ProjectDetailsView = React.memo(({
                                   v{version}
                                 </span>
                                 {name?.includes('/') && (
-                                  <Badge className="bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md">Verified Registry Match</Badge>
+                                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md hover:bg-emerald-700 hover:text-white transition-colors cursor-default">Verified Registry Match</Badge>
                                 )}
                               </div>
                             </div>
