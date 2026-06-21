@@ -252,6 +252,15 @@ export const mockInvoke = async (cmd, args = {}) => {
       return ['react', 'vite']
     }
 
+    case 'detect_frameworks': {
+      return [
+        { name: 'React', version: '18.3.1', package_manager: 'npm' },
+        { name: 'Vue', version: '3.4.21', package_manager: 'npm' },
+        { name: 'Svelte', version: '4.2.12', package_manager: 'pnpm' },
+        { name: 'Next.js', version: '14.2.3', package_manager: 'npm' }
+      ]
+    }
+
     case 'run_package_script': {
       console.log(`[MOCK] Running script: ${args.scriptName} in ${args.projectPath}`)
       return "Script started"

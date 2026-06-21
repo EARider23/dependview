@@ -144,6 +144,7 @@ export const techIcons = {
     // Languages
     'typescript': { name: 'TypeScript', color: 'bg-[#3178c6]', icon: 'TS', textColor: 'text-white', image: typescriptIcon },
     'javascript': { name: 'JavaScript', color: 'bg-yellow-400', icon: 'JS', textColor: 'text-black', image: javascriptIcon },
+    'html': { name: 'HTML', color: 'bg-orange-500', icon: 'H', textColor: 'text-white', image: htmlIcon },
     'python': { name: 'Python', color: 'bg-blue-50', icon: 'Py', textColor: 'text-blue-600', image: pythonIcon },
     'rust': { name: 'Rust', color: 'bg-[#000000]/80', icon: 'R', textColor: 'text-white', image: rustIcon },
     'go': { name: 'Go', color: 'bg-teal-500', icon: 'Go', textColor: 'text-white', image: goIcon },
@@ -166,6 +167,7 @@ export const techIcons = {
     'pip': { name: 'pip', color: 'bg-blue-500', icon: '🐍', textColor: 'text-white', image: pipIcon },
     'bun': { name: 'Bun', color: 'bg-black', icon: 'B', textColor: 'text-white', image: bunIcon },
     'yarn': { name: 'Yarn', color: 'bg-blue-500', icon: 'Y', textColor: 'text-white', image: yarnIcon },
+    'pub': { name: 'pub.dev', color: 'bg-blue-500', icon: 'P', textColor: 'text-white', image: pubIcon },
     'babel': { name: 'Babel', color: 'bg-yellow-500', icon: 'B', textColor: 'text-black', image: babelIcon },
     'rollup': { name: 'Rollup', color: 'bg-red-600', icon: 'R', textColor: 'text-white', image: rollupIcon },
     'esbuild': { name: 'esbuild', color: 'bg-yellow-500', icon: 'E', textColor: 'text-black', image: esbuildIcon },
@@ -188,6 +190,8 @@ export const techIcons = {
     'material-ui': { name: 'Material UI', color: 'bg-blue-600', icon: 'M', textColor: 'text-white', image: materialuiIcon },
     'ant-design': { name: 'Ant Design', color: 'bg-blue-500', icon: 'A', textColor: 'text-white', image: antdesignIcon },
     'lucide': { name: 'Lucide', color: 'bg-orange-500', icon: 'L', textColor: 'text-white', image: lucideIcon },
+    'react-icons': { name: 'React Icons', color: 'bg-pink-500', icon: 'R', textColor: 'text-white', image: reacticonsIcon },
+    'heroicons': { name: 'Heroicons', color: 'bg-purple-600', icon: 'H', textColor: 'text-white', image: heroiconsIcon },
 
     // State Management
     'redux': { name: 'Redux', color: 'bg-purple-700', icon: 'R', textColor: 'text-white', image: reduxIcon },
@@ -291,11 +295,17 @@ export const techIcons = {
     'cypress': { name: 'Cypress', color: 'bg-gray-700', icon: 'C', textColor: 'text-white', image: cypressIcon },
     'playwright': { name: 'Playwright', color: 'bg-green-600', icon: 'P', textColor: 'text-white', image: playwrightIcon },
     'testing-library': { name: 'Testing Library', color: 'bg-red-600', icon: '🐙', textColor: 'text-white', image: testinglibraryIcon },
+    'storybook': { name: 'Storybook', color: 'bg-pink-500', icon: 'S', textColor: 'text-white', image: storybookIcon },
 
     // Misc & Utilities
     'lodash': { name: 'Lodash', color: 'bg-blue-600', icon: 'L', textColor: 'text-white', image: lodashIcon },
+    'ramda': { name: 'Ramda', color: 'bg-blue-600', icon: 'R', textColor: 'text-white', image: ramdaIcon },
     'axios': { name: 'Axios', color: 'bg-purple-500', icon: 'A', textColor: 'text-white', image: axiosIcon },
     'zod': { name: 'Zod', color: 'bg-blue-600', icon: 'Z', textColor: 'text-white', image: zodIcon },
+    'yup': { name: 'Yup', color: 'bg-gray-800', icon: 'Y', textColor: 'text-white', image: yupIcon },
+    'react-hook-form': { name: 'React Hook Form', color: 'bg-pink-500', icon: 'R', textColor: 'text-white', image: reacthookformIcon },
+    'eslint': { name: 'ESLint', color: 'bg-purple-600', icon: 'E', textColor: 'text-white', image: eslintIcon },
+    'prettier': { name: 'Prettier', color: 'bg-gray-800', icon: 'P', textColor: 'text-white', image: prettierIcon },
     'date-fns': { name: 'date-fns', color: 'bg-purple-500', icon: 'D', textColor: 'text-white', image: datefnsIcon },
     'dayjs': { name: 'Day.js', color: 'bg-orange-500', icon: 'D', textColor: 'text-white', image: dayjsIcon },
     'moment': { name: 'Moment.js', color: 'bg-black', icon: 'M', textColor: 'text-white', image: momentjsIcon },
