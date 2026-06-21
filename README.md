@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="src-tauri/icons/icon.png" width="128" alt="Deped Logo">
+  <img src="logo.svg" width="128" alt="PEEAK Logo">
   <h1>PEEAK</h1>
   <p><strong>A Modern, Visual Package Manager & Project Analyzer</strong></p>
 </div>
 
 ---
 
-**Deped** is a powerful desktop application built with Tauri, React, and Rust. It provides developers with a sleek, unified interface to manage dependencies across multiple programming languages and frameworks.
+**PEEAK** is a powerful desktop application built with Tauri, React, and Rust. It provides developers with a sleek, unified interface to manage dependencies across multiple programming languages and frameworks.
 
 ## ✨ Key Features
 
@@ -21,12 +21,12 @@
 ## 🚀 Quick Start (For Users)
 
 1. Download the latest release from the [Releases page](../../releases).
-2. Install and run **Deped**. No prerequisites or complex setup required!
+2. Install and run **PEEAK**. No prerequisites or complex setup required!
 3. Click "Browse & Import Project" to scan your first project folder.
 
 ## 💻 For Developers
 
-Want to build **Deped** from source or contribute to the project? Here's how to get started:
+Want to build **PEEAK** from source or contribute to the project? Here's how to get started:
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18 or higher)
@@ -62,7 +62,7 @@ The final executable will be located in the `src-tauri/target/release/` director
 
 ## 🏗️ Architecture & Tech Stack
 
-Deped is structured as a modern desktop application, utilizing the best web and systems programming technologies:
+PEEAK is structured as a modern desktop application, utilizing the best web and systems programming technologies:
 
 - **Frontend Interface**: React 18, Vite, Tailwind CSS, shadcn/ui
 - **Core Backend Engine**: Rust, Tauri v2
