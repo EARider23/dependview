@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Package Space Analyzer",
+  "productName": "Deped",
   "version": "0.1.0",
-  "identifier": "com.pkganalyzer.peeak",
+  "identifier": "com.deped.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Package Space Analyzer",
+        "title": "Deped",
         "width": 1400,
         "height": 900,
         "resizable": true,

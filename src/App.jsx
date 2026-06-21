@@ -134,7 +134,10 @@ function App() {
   const showTabBar = viewMode !== 'project'
 
   return (
-    <div className="min-h-screen bg-[#fcfcfd] text-gray-900 font-sans selection:bg-purple-100 selection:text-purple-900">
+    <div 
+      className="min-h-screen bg-[#fcfcfd] text-gray-900 font-sans selection:bg-purple-100 selection:text-purple-900"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* Background Decor */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <motion.div

@@ -60,6 +60,9 @@
     font-family: 'Sora', sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
   }
   #root {
     @apply min-h-screen;
