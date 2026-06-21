@@ -61,6 +61,8 @@ function App() {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(false)
+  const isDebugMode = false; // Set to true to show debug buttons for onboarding/launch
+
   const [appSettings, setAppSettings] = useState({
     theme: 'light',
     autoScan: true,
@@ -225,23 +227,27 @@ function App() {
               <Settings className="w-5 h-5" />
             </motion.button>
 
-            {/* Temp button to test onboarding! */}
-            <motion.button
-              onClick={triggerOnboardingTest}
-              className="px-3 py-1 ml-2 text-xs font-bold text-white bg-black rounded-full shadow-lg"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Test Onboarding
-            </motion.button>
-            <motion.button
-              onClick={triggerLaunchModalTest}
-              className="px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-full shadow-lg"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Test Launch Modal
-            </motion.button>
+            {/* Debug Buttons (Hidden by default) */}
+            {isDebugMode && (
+              <>
+                <motion.button
+                  onClick={triggerOnboardingTest}
+                  className="px-3 py-1 ml-2 text-xs font-bold text-white bg-black rounded-full shadow-lg"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Test Onboarding
+                </motion.button>
+                <motion.button
+                  onClick={triggerLaunchModalTest}
+                  className="px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-full shadow-lg"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Test Launch Modal
+                </motion.button>
+              </>
+            )}
           </div>
         </div>
       </header>
